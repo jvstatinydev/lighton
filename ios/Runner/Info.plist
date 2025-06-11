@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleDisplayName</key>
+	<string>Light On - Flashlight</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>Light On - Flashlight</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>ko</string>
+		<string>en</string>
+		<string>ja</string>
+		<string>zh_Hans</string>
+		<string>zh_Hant</string>
+		<string>it</string>
+		<string>fr</string>
+		<string>de</string>
+		<string>nl</string>
+		<string>es</string>
+		<string>ar</string>
+		<string>vi</string>
+		<string>ta</string>
+		<string>th</string>
+		<string>tr</string>
+		<string>uk</string>
+		<string>id</string>
+		<string>ms</string>
+		<string>pl</string>
+		<string>pt</string>
+		<string>sv</string>
+		<string>da</string>
+		<string>hu</string>
+		<string>el</string>
+		<string>he</string>
+		<string>hi</string>
+		<string>lv</string>
+		<string>ne</string>
+		<string>mn</string>
+		<string>uz</string>
+		<string>sl</string>
+		<string>ro</string>
+		<string>ml</string>
+		<string>no</string>
+		<string>ru</string>
+		<string>sk</string>
+		<string>fa</string>
+		<string>af</string>
+		<string>az</string>
+		<string>am</string>
+		<string>eu</string>
+		<string>be</string>
+		<string>bn</string>
+		<string>my</string>
+		<string>bs</string>
+		<string>bg</string>
+		<string>km</string>
+		<string>sq</string>
+		<string>cs</string>
+		<string>hr</string>
+		<string>et</string>
+		<string>hy</string>
+		<string>fi</string>
+		<string>ka</string>
+		<string>gu</string>
+		<string>is</string>
+		<string>gl</string>
+		<string>kn</string>
+		<string>kk</string>
+		<string>lo</string>
+		<string>mk</string>
+		<string>mr</string>
+		<string>lt</string>
+		<string>ca</string>
+		<string>or</string>
+		<string>pa</string>
+		<string>ps</string>
+		<string>sr</string>
+		<string>sm</string>
+		<string>si</string>
+		<string>sw</string>
+		<string>te</string>
+		<string>sd</string>
+		<string>tl</string>
+		<string>ur</string>
+		<string>ky</string>
+		<string>zu</string>
+	</array>
+
+	<key>CFBundleShortVersionString</key>
+	<string>$(FLUTTER_BUILD_NAME)</string>
+	<key>CFBundleSignature</key>
+	<string>????</string>
+	<key>CFBundleURLTypes</key>
+	<array>        <dict>
+        <key>CFBundleTypeRole</key>
+        <string>Editor</string>
+        <key>CFBundleURLName</key>
+        <string>lightonflashlight.com</string>
+        <key>CFBundleURLSchemes</key>
+        <array>
+        <string>lightonflashlight</string>
+        </array>
+        </dict>
+    </array>
+    <key>FlutterDeepLinkingEnabled</key>
+    <true/>
+
+
+	<key>CFBundleVersion</key>
+	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+
+
+
+
+
+
+	<key>UILaunchStoryboardName</key>
+	<string>LaunchScreen</string>
+	<key>UIMainStoryboardFile</key>
+	<string>Main</string>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UIViewControllerBasedStatusBarAppearance</key>
+	<false/>
+
+</dict>
+</plist>
