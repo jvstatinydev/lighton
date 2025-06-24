@@ -45,7 +45,7 @@
     <!-- 프랑스어 -->
     <activity-alias android:name=".AliasFrench" android:targetActivity=".MainActivity" android:label="Lampe de poche" android:exported="true"/>
     <!-- 프랑스어 -->
-    <activity-alias android:name=".AliasFrench" android:targetActivity=".MainActivity" android:label="torche" android:exported="true"/>
+    <activity-alias android:name=".AliasFrench2" android:targetActivity=".MainActivity" android:label="torche" android:exported="true"/>
     <!-- 독일어 -->
     <activity-alias android:name=".AliasGerman" android:targetActivity=".MainActivity" android:label="Taschenlampe" android:exported="true"/>
     <!-- 스페인어 -->
