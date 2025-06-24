@@ -142,67 +142,78 @@ class _HomePageWidgetState extends State<HomePageWidget>
   Widget build(BuildContext context) {
     context.watch<FFAppState>();
 
-    return GestureDetector(
-      onTap: () {
-        FocusScope.of(context).unfocus();
-        FocusManager.instance.primaryFocus?.unfocus();
-      },
-      child: Scaffold(
-        key: scaffoldKey,
-        backgroundColor: FlutterFlowTheme.of(context).secondaryBackground,
-        appBar: AppBar(
-          backgroundColor: FlutterFlowTheme.of(context).primaryBackground,
-          automaticallyImplyLeading: false,
-          title: Text(
-            FFLocalizations.of(context).getText(
-              'iq5z1i00' /* 손전등 */,
-            ),
-            style: FlutterFlowTheme.of(context).headlineMedium.override(
-                  font: GoogleFonts.interTight(
+    return Opacity(
+      opacity: 0.9,
+      child: GestureDetector(
+        onTap: () {
+          FocusScope.of(context).unfocus();
+          FocusManager.instance.primaryFocus?.unfocus();
+        },
+        child: Scaffold(
+          key: scaffoldKey,
+          backgroundColor: FlutterFlowTheme.of(context).secondaryBackground,
+          appBar: AppBar(
+            backgroundColor: FlutterFlowTheme.of(context).primaryBackground,
+            automaticallyImplyLeading: false,
+            title: Text(
+              FFLocalizations.of(context).getText(
+                'iq5z1i00' /* 손전등 */,
+              ),
+              style: FlutterFlowTheme.of(context).headlineMedium.override(
+                    font: GoogleFonts.interTight(
+                      fontWeight: FlutterFlowTheme.of(context)
+                          .headlineMedium
+                          .fontWeight,
+                      fontStyle:
+                          FlutterFlowTheme.of(context).headlineMedium.fontStyle,
+                    ),
+                    color: FlutterFlowTheme.of(context).primaryText,
+                    fontSize: 22.0,
+                    letterSpacing: 0.0,
                     fontWeight:
                         FlutterFlowTheme.of(context).headlineMedium.fontWeight,
                     fontStyle:
                         FlutterFlowTheme.of(context).headlineMedium.fontStyle,
                   ),
-                  color: FlutterFlowTheme.of(context).primaryText,
-                  fontSize: 22.0,
-                  letterSpacing: 0.0,
-                  fontWeight:
-                      FlutterFlowTheme.of(context).headlineMedium.fontWeight,
-                  fontStyle:
-                      FlutterFlowTheme.of(context).headlineMedium.fontStyle,
-                ),
+            ),
+            actions: [],
+            centerTitle: false,
+            elevation: 2.0,
           ),
-          actions: [],
-          centerTitle: false,
-          elevation: 2.0,
-        ),
-        body: SafeArea(
-          top: true,
-          child: Column(
-            mainAxisSize: MainAxisSize.max,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                mainAxisSize: MainAxisSize.max,
-                mainAxisAlignment: MainAxisAlignment.end,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: MediaQuery.sizeOf(context).width * 0.6,
-                    decoration: BoxDecoration(
-                      color: FlutterFlowTheme.of(context).secondaryBackground,
-                    ),
-                    child: FlutterFlowLanguageSelector(
-                      backgroundColor:
-                          FlutterFlowTheme.of(context).secondaryBackground,
-                      borderColor: Colors.transparent,
-                      dropdownIconColor:
-                          FlutterFlowTheme.of(context).secondaryText,
-                      borderRadius: 0.0,
-                      textStyle:
-                          FlutterFlowTheme.of(context).bodyLarge.override(
-                                font: GoogleFonts.inter(
+          body: SafeArea(
+            top: true,
+            child: Column(
+              mainAxisSize: MainAxisSize.max,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.max,
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: MediaQuery.sizeOf(context).width * 0.6,
+                      decoration: BoxDecoration(
+                        color: FlutterFlowTheme.of(context).secondaryBackground,
+                      ),
+                      child: FlutterFlowLanguageSelector(
+                        backgroundColor:
+                            FlutterFlowTheme.of(context).secondaryBackground,
+                        borderColor: Colors.transparent,
+                        dropdownIconColor:
+                            FlutterFlowTheme.of(context).secondaryText,
+                        borderRadius: 0.0,
+                        textStyle:
+                            FlutterFlowTheme.of(context).bodyLarge.override(
+                                  font: GoogleFonts.inter(
+                                    fontWeight: FlutterFlowTheme.of(context)
+                                        .bodyLarge
+                                        .fontWeight,
+                                    fontStyle: FlutterFlowTheme.of(context)
+                                        .bodyLarge
+                                        .fontStyle,
+                                  ),
+                                  letterSpacing: 0.0,
                                   fontWeight: FlutterFlowTheme.of(context)
                                       .bodyLarge
                                       .fontWeight,
@@ -210,170 +221,165 @@ class _HomePageWidgetState extends State<HomePageWidget>
                                       .bodyLarge
                                       .fontStyle,
                                 ),
-                                letterSpacing: 0.0,
-                                fontWeight: FlutterFlowTheme.of(context)
-                                    .bodyLarge
-                                    .fontWeight,
-                                fontStyle: FlutterFlowTheme.of(context)
-                                    .bodyLarge
-                                    .fontStyle,
-                              ),
-                      hideFlags: false,
-                      flagSize: 16.0,
-                      flagTextGap: 8.0,
-                      currentLanguage: FFLocalizations.of(context).languageCode,
-                      languages: FFLocalizations.languages(),
-                      onChanged: (lang) => setAppLanguage(context, lang),
-                    ),
-                  ),
-                ],
-              ),
-              Expanded(
-                flex: 6,
-                child: Row(
-                  mainAxisSize: MainAxisSize.max,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    if (!valueOrDefault<bool>(
-                      FFAppState().isFlashOn,
-                      true,
-                    ))
-                      Expanded(
-                        child: Align(
-                          alignment: AlignmentDirectional(0.0, 0.0),
-                          child: FFButtonWidget(
-                            onPressed: () async {
-                              await action_blocks
-                                  .toggleFlashlightThenUpdateState(context);
-                              if (animationsMap[
-                                      'buttonOnActionTriggerAnimation2'] !=
-                                  null) {
-                                await animationsMap[
-                                        'buttonOnActionTriggerAnimation2']!
-                                    .controller
-                                    .forward(from: 0.0);
-                              }
-                            },
-                            text: FFLocalizations.of(context).getText(
-                              'c0ob4q61' /* 꺼짐 */,
-                            ),
-                            options: FFButtonOptions(
-                              width: MediaQuery.sizeOf(context).width * 0.8,
-                              height: MediaQuery.sizeOf(context).height * 0.5,
-                              padding: EdgeInsetsDirectional.fromSTEB(
-                                  16.0, 0.0, 16.0, 0.0),
-                              iconPadding: EdgeInsetsDirectional.fromSTEB(
-                                  0.0, 0.0, 0.0, 0.0),
-                              color: FlutterFlowTheme.of(context).alternate,
-                              textStyle: FlutterFlowTheme.of(context)
-                                  .titleSmall
-                                  .override(
-                                    font: GoogleFonts.interTight(
-                                      fontWeight: FlutterFlowTheme.of(context)
-                                          .titleSmall
-                                          .fontWeight,
-                                      fontStyle: FlutterFlowTheme.of(context)
-                                          .titleSmall
-                                          .fontStyle,
-                                    ),
-                                    color: FlutterFlowTheme.of(context)
-                                        .primaryText,
-                                    fontSize: 60.0,
-                                    letterSpacing: 0.0,
-                                    fontWeight: FlutterFlowTheme.of(context)
-                                        .titleSmall
-                                        .fontWeight,
-                                    fontStyle: FlutterFlowTheme.of(context)
-                                        .titleSmall
-                                        .fontStyle,
-                                  ),
-                              elevation: 0.0,
-                              borderRadius: BorderRadius.circular(8.0),
-                            ),
-                          ).animateOnActionTrigger(
-                            animationsMap['buttonOnActionTriggerAnimation1']!,
-                          ),
-                        ),
+                        hideFlags: false,
+                        flagSize: 16.0,
+                        flagTextGap: 8.0,
+                        currentLanguage:
+                            FFLocalizations.of(context).languageCode,
+                        languages: FFLocalizations.languages(),
+                        onChanged: (lang) => setAppLanguage(context, lang),
                       ),
-                    if (valueOrDefault<bool>(
-                      FFAppState().isFlashOn,
-                      true,
-                    ))
-                      Expanded(
-                        child: Align(
-                          alignment: AlignmentDirectional(0.0, 0.0),
-                          child: FFButtonWidget(
-                            onPressed: () async {
-                              await action_blocks
-                                  .toggleFlashlightThenUpdateState(context);
-                              if (animationsMap[
-                                      'buttonOnActionTriggerAnimation1'] !=
-                                  null) {
-                                await animationsMap[
-                                        'buttonOnActionTriggerAnimation1']!
-                                    .controller
-                                    .forward(from: 0.0);
-                              }
-                            },
-                            text: FFLocalizations.of(context).getText(
-                              '24qab3qx' /* 켜짐 */,
-                            ),
-                            options: FFButtonOptions(
-                              width: MediaQuery.sizeOf(context).width * 0.8,
-                              height: MediaQuery.sizeOf(context).height * 0.5,
-                              padding: EdgeInsetsDirectional.fromSTEB(
-                                  16.0, 0.0, 16.0, 0.0),
-                              iconAlignment: IconAlignment.start,
-                              iconPadding: EdgeInsetsDirectional.fromSTEB(
-                                  0.0, 0.0, 0.0, 0.0),
-                              color: Color(0xFF38B6A8),
-                              textStyle: FlutterFlowTheme.of(context)
-                                  .titleSmall
-                                  .override(
-                                    font: GoogleFonts.interTight(
-                                      fontWeight: FlutterFlowTheme.of(context)
-                                          .titleSmall
-                                          .fontWeight,
-                                      fontStyle: FlutterFlowTheme.of(context)
-                                          .titleSmall
-                                          .fontStyle,
-                                    ),
-                                    color: Colors.white,
-                                    fontSize: 60.0,
-                                    letterSpacing: 0.0,
-                                    fontWeight: FlutterFlowTheme.of(context)
-                                        .titleSmall
-                                        .fontWeight,
-                                    fontStyle: FlutterFlowTheme.of(context)
-                                        .titleSmall
-                                        .fontStyle,
-                                  ),
-                              elevation: 0.0,
-                              borderRadius: BorderRadius.circular(8.0),
-                            ),
-                          ).animateOnActionTrigger(
-                            animationsMap['buttonOnActionTriggerAnimation2']!,
-                          ),
-                        ),
-                      ),
-                  ],
-                ).animateOnPageLoad(animationsMap['rowOnPageLoadAnimation']!),
-              ),
-              Expanded(
-                flex: 1,
-                child: Column(
-                  mainAxisSize: MainAxisSize.max,
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    FlutterFlowAdBanner(
-                      showsTestAd: false,
-                      androidAdUnitID: 'ca-app-pub-3228085068090706/4930787659',
                     ),
                   ],
                 ),
-              ),
-            ],
+                Expanded(
+                  flex: 6,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.max,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      if (!valueOrDefault<bool>(
+                        FFAppState().isFlashOn,
+                        true,
+                      ))
+                        Expanded(
+                          child: Align(
+                            alignment: AlignmentDirectional(0.0, 0.0),
+                            child: FFButtonWidget(
+                              onPressed: () async {
+                                await action_blocks
+                                    .toggleFlashlightThenUpdateState(context);
+                                if (animationsMap[
+                                        'buttonOnActionTriggerAnimation2'] !=
+                                    null) {
+                                  await animationsMap[
+                                          'buttonOnActionTriggerAnimation2']!
+                                      .controller
+                                      .forward(from: 0.0);
+                                }
+                              },
+                              text: FFLocalizations.of(context).getText(
+                                'c0ob4q61' /* 꺼짐 */,
+                              ),
+                              options: FFButtonOptions(
+                                width: MediaQuery.sizeOf(context).width * 0.8,
+                                height: MediaQuery.sizeOf(context).height * 0.5,
+                                padding: EdgeInsetsDirectional.fromSTEB(
+                                    16.0, 0.0, 16.0, 0.0),
+                                iconPadding: EdgeInsetsDirectional.fromSTEB(
+                                    0.0, 0.0, 0.0, 0.0),
+                                color: FlutterFlowTheme.of(context).alternate,
+                                textStyle: FlutterFlowTheme.of(context)
+                                    .titleSmall
+                                    .override(
+                                      font: GoogleFonts.interTight(
+                                        fontWeight: FlutterFlowTheme.of(context)
+                                            .titleSmall
+                                            .fontWeight,
+                                        fontStyle: FlutterFlowTheme.of(context)
+                                            .titleSmall
+                                            .fontStyle,
+                                      ),
+                                      color: FlutterFlowTheme.of(context)
+                                          .primaryText,
+                                      fontSize: 60.0,
+                                      letterSpacing: 0.0,
+                                      fontWeight: FlutterFlowTheme.of(context)
+                                          .titleSmall
+                                          .fontWeight,
+                                      fontStyle: FlutterFlowTheme.of(context)
+                                          .titleSmall
+                                          .fontStyle,
+                                    ),
+                                elevation: 0.0,
+                                borderRadius: BorderRadius.circular(8.0),
+                              ),
+                            ).animateOnActionTrigger(
+                              animationsMap['buttonOnActionTriggerAnimation1']!,
+                            ),
+                          ),
+                        ),
+                      if (valueOrDefault<bool>(
+                        FFAppState().isFlashOn,
+                        true,
+                      ))
+                        Expanded(
+                          child: Align(
+                            alignment: AlignmentDirectional(0.0, 0.0),
+                            child: FFButtonWidget(
+                              onPressed: () async {
+                                await action_blocks
+                                    .toggleFlashlightThenUpdateState(context);
+                                if (animationsMap[
+                                        'buttonOnActionTriggerAnimation1'] !=
+                                    null) {
+                                  await animationsMap[
+                                          'buttonOnActionTriggerAnimation1']!
+                                      .controller
+                                      .forward(from: 0.0);
+                                }
+                              },
+                              text: FFLocalizations.of(context).getText(
+                                '24qab3qx' /* 켜짐 */,
+                              ),
+                              options: FFButtonOptions(
+                                width: MediaQuery.sizeOf(context).width * 0.8,
+                                height: MediaQuery.sizeOf(context).height * 0.5,
+                                padding: EdgeInsetsDirectional.fromSTEB(
+                                    16.0, 0.0, 16.0, 0.0),
+                                iconAlignment: IconAlignment.start,
+                                iconPadding: EdgeInsetsDirectional.fromSTEB(
+                                    0.0, 0.0, 0.0, 0.0),
+                                color: Color(0xFF38B6A8),
+                                textStyle: FlutterFlowTheme.of(context)
+                                    .titleSmall
+                                    .override(
+                                      font: GoogleFonts.interTight(
+                                        fontWeight: FlutterFlowTheme.of(context)
+                                            .titleSmall
+                                            .fontWeight,
+                                        fontStyle: FlutterFlowTheme.of(context)
+                                            .titleSmall
+                                            .fontStyle,
+                                      ),
+                                      color: Colors.white,
+                                      fontSize: 60.0,
+                                      letterSpacing: 0.0,
+                                      fontWeight: FlutterFlowTheme.of(context)
+                                          .titleSmall
+                                          .fontWeight,
+                                      fontStyle: FlutterFlowTheme.of(context)
+                                          .titleSmall
+                                          .fontStyle,
+                                    ),
+                                elevation: 0.0,
+                                borderRadius: BorderRadius.circular(8.0),
+                              ),
+                            ).animateOnActionTrigger(
+                              animationsMap['buttonOnActionTriggerAnimation2']!,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ).animateOnPageLoad(animationsMap['rowOnPageLoadAnimation']!),
+                ),
+                Expanded(
+                  flex: 1,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.max,
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      FlutterFlowAdBanner(
+                        showsTestAd: false,
+                        androidAdUnitID:
+                            'ca-app-pub-3228085068090706/4930787659',
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
