@@ -188,34 +188,43 @@ class _HomePageWidgetState extends State<HomePageWidget>
                 mainAxisAlignment: MainAxisAlignment.end,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  FlutterFlowLanguageSelector(
-                    backgroundColor:
-                        FlutterFlowTheme.of(context).secondaryBackground,
-                    borderColor: Colors.transparent,
-                    dropdownIconColor:
-                        FlutterFlowTheme.of(context).secondaryText,
-                    borderRadius: 0.0,
-                    textStyle: FlutterFlowTheme.of(context).bodyLarge.override(
-                          font: GoogleFonts.inter(
-                            fontWeight: FlutterFlowTheme.of(context)
-                                .bodyLarge
-                                .fontWeight,
-                            fontStyle: FlutterFlowTheme.of(context)
-                                .bodyLarge
-                                .fontStyle,
-                          ),
-                          letterSpacing: 0.0,
-                          fontWeight:
-                              FlutterFlowTheme.of(context).bodyLarge.fontWeight,
-                          fontStyle:
-                              FlutterFlowTheme.of(context).bodyLarge.fontStyle,
-                        ),
-                    hideFlags: false,
-                    flagSize: 16.0,
-                    flagTextGap: 8.0,
-                    currentLanguage: FFLocalizations.of(context).languageCode,
-                    languages: FFLocalizations.languages(),
-                    onChanged: (lang) => setAppLanguage(context, lang),
+                  Container(
+                    width: MediaQuery.sizeOf(context).width * 0.6,
+                    decoration: BoxDecoration(
+                      color: FlutterFlowTheme.of(context).secondaryBackground,
+                    ),
+                    child: FlutterFlowLanguageSelector(
+                      backgroundColor:
+                          FlutterFlowTheme.of(context).secondaryBackground,
+                      borderColor: Colors.transparent,
+                      dropdownIconColor:
+                          FlutterFlowTheme.of(context).secondaryText,
+                      borderRadius: 0.0,
+                      textStyle:
+                          FlutterFlowTheme.of(context).bodyLarge.override(
+                                font: GoogleFonts.inter(
+                                  fontWeight: FlutterFlowTheme.of(context)
+                                      .bodyLarge
+                                      .fontWeight,
+                                  fontStyle: FlutterFlowTheme.of(context)
+                                      .bodyLarge
+                                      .fontStyle,
+                                ),
+                                letterSpacing: 0.0,
+                                fontWeight: FlutterFlowTheme.of(context)
+                                    .bodyLarge
+                                    .fontWeight,
+                                fontStyle: FlutterFlowTheme.of(context)
+                                    .bodyLarge
+                                    .fontStyle,
+                              ),
+                      hideFlags: false,
+                      flagSize: 16.0,
+                      flagTextGap: 8.0,
+                      currentLanguage: FFLocalizations.of(context).languageCode,
+                      languages: FFLocalizations.languages(),
+                      onChanged: (lang) => setAppLanguage(context, lang),
+                    ),
                   ),
                 ],
               ),

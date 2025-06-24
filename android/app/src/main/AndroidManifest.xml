@@ -38,10 +38,10 @@
     <!-- Start of localization support -->
     <!-- 한국어 -->
     <activity-alias android:name=".AliasKorean" android:targetActivity=".MainActivity" android:label="라이트온 - 손전등" android:exported="true">
-      <intent-filter>
+      <!--     <intent-filter>
         <action android:name="android.intent.action.MAIN"/>
         <category android:name="android.intent.category.LAUNCHER"/>
-      </intent-filter>
+    </intent-filter> -->
     </activity-alias>
     <!-- 일본어 -->
     <activity-alias android:name=".AliasJapanese" android:targetActivity=".MainActivity" android:label="ライトオン - 懐中電灯" android:exported="true"/>
@@ -67,6 +67,39 @@
     <activity-alias android:name=".AliasThai" android:targetActivity=".MainActivity" android:label="ไฟเปิด - ไฟฉาย" android:exported="true"/>
     <activity-alias android:name=".AliasTurkish" android:targetActivity=".MainActivity" android:label="Işık Açık - El Feneri" android:exported="true"/>
     <activity-alias android:name=".AliasPolish" android:targetActivity=".MainActivity" android:label="Światło włączone - latarka" android:exported="true"/>
+    <!-- 한국어 -->
+    <activity-alias android:name=".AliasKorean2" android:targetActivity=".MainActivity" android:label="손전등" android:exported="true">
+      <!--     <intent-filter>
+        <action android:name="android.intent.action.MAIN"/>
+        <category android:name="android.intent.category.LAUNCHER"/>
+    </intent-filter> -->
+    </activity-alias>
+    <!-- 일본어 -->
+    <activity-alias android:name=".AliasJapanese2" android:targetActivity=".MainActivity" android:label="懐中電灯" android:exported="true"/>
+    <!-- 중국어 간체 -->
+    <activity-alias android:name=".AliasChineseSimplified2" android:targetActivity=".MainActivity" android:label="手电筒" android:exported="true"/>
+    <!-- 프랑스어 -->
+    <activity-alias android:name=".AliasFrench2" android:targetActivity=".MainActivity" android:label="Lampe de poche" android:exported="true"/>
+    <!-- 프랑스어 -->
+    <activity-alias android:name=".AliasFrench3" android:targetActivity=".MainActivity" android:label="torche" android:exported="true"/>
+    <!-- 독일어 -->
+    <activity-alias android:name=".AliasGerman2" android:targetActivity=".MainActivity" android:label="Taschenlampe" android:exported="true"/>
+    <!-- 스페인어 -->
+    <activity-alias android:name=".AliasSpanish2" android:targetActivity=".MainActivity" android:label="Linterna" android:exported="true"/>
+    <!-- 러시아어 -->
+    <activity-alias android:name=".AliasRussian2" android:targetActivity=".MainActivity" android:label="Фонарик" android:exported="true"/>
+    <!-- 아랍어 (RTL 언어) -->
+    <activity-alias android:name=".AliasArabic2" android:targetActivity=".MainActivity" android:label="مصباح يدوي كشاف" android:exported="true"/>
+    <!-- 힌디어 -->
+    <activity-alias android:name=".AliasHindi2" android:targetActivity=".MainActivity" android:label="टॉर्च" android:exported="true"/>
+    <!-- 포르투갈어 -->
+    <activity-alias android:name=".AliasPortuguese2" android:targetActivity=".MainActivity" android:label="Lanterna" android:exported="true"/>
+    <activity-alias android:name=".AliasVietnamese2" android:targetActivity=".MainActivity" android:label="Đèn pin" android:exported="true"/>
+    <activity-alias android:name=".AliasItalian2" android:targetActivity=".MainActivity" android:label="Torcia elettrica" android:exported="true"/>
+    <activity-alias android:name=".AliasIndonesian2" android:targetActivity=".MainActivity" android:label="Senter" android:exported="true"/>
+    <activity-alias android:name=".AliasThai2" android:targetActivity=".MainActivity" android:label="ไฟฉาย" android:exported="true"/>
+    <activity-alias android:name=".AliasTurkish2" android:targetActivity=".MainActivity" android:label="El Feneri" android:exported="true"/>
+    <activity-alias android:name=".AliasPolish2" android:targetActivity=".MainActivity" android:label="latarka" android:exported="true"/>
     <!-- End of localization support -->
   </application>
 </manifest>
