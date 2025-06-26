@@ -1,0 +1,33 @@
+# Flutter
+/.dart_tool/
+/.flutter-plugins
+/.flutter-plugins-dependencies
+/.packages
+/.pub-cache/
+/build/
+
+# Android
+**/android/app/build/
+**/android/app/*.keystore
+# key.properties는 git에 커밋하지 마세요. (임시로 주석 처리)
+# **/android/key.properties
+
+# iOS
+**/ios/Flutter/Flutter.framework
+**/ios/Flutter/Flutter.podspec
+**/ios/Flutter/app.framework
+**/ios/Flutter/app.dSYM
+android/build.gradle
+pubspec.lock
+.idea/lighton.iml
+.idea/modules.xml
+.idea/vcs.xml
+.idea/caches/deviceStreaming.xml
+.idea/libraries/Dart_Packages.xml
+.idea/libraries/Dart_SDK.xml
+.idea/libraries/Flutter_Plugins.xml
+android/build.gradle
+debug-info/app.android-arm.symbols
+debug-info/app.android-arm64.symbols
+debug-info/app.android-x64.symbols
+flashlight-5zckwk-keystore/flashlight-5zckwk-keystore/credentials.txt
