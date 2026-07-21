@@ -53,3 +53,4 @@ Launcher icons are regenerated with `dart run flutter_launcher_icons` (config li
 
 - `pubspec.yaml` pins exact dependency versions and uses `dependency_overrides` for `http` and `uuid` — keep pins exact when editing (this matches FlutterFlow's export behavior).
 - `test/widget_test.dart` is the default FlutterFlow smoke test and calls `MyApp()` with no args; it is a placeholder, not real coverage.
+- The AdMob application ID is configured natively (Android: `android/app/src/main/AndroidManifest.xml`) rather than in Dart — look there when changing ad setup.
