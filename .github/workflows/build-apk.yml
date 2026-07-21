@@ -1,0 +1,46 @@
+name: Build Android APK
+
+# Builds an installable release APK in the cloud so the app can be updated
+# without a local machine. The release build is signed with the debug key
+# (see android/app/build.gradle), so the resulting APK installs directly on a
+# phone. For a Play Store upload you will later need a real signing key.
+
+on:
+  push:
+    branches:
+      - flutterflow
+      - "claude/**"
+  workflow_dispatch: {} # lets you trigger a build manually from the GitHub website
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: "3.27.4" # ships Dart 3.6 + collection 1.19.0 to match the exact pins in pubspec.yaml
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build release APK
+        run: flutter build apk --release
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: light-on-flashlight-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
