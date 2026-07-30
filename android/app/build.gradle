@@ -33,14 +33,13 @@ if (keystorePropertiesFile.exists()) {
 android {
     namespace "com.mycompany.lightonflashlight"
     compileSdk 36
+    // path_provider_android가 의존하는 jni 패키지가 요구하는 버전.
+    // NDK는 하위 호환되므로 플러그인들이 요구하는 최고 버전을 쓴다.
+    ndkVersion "28.2.13676358"
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
-    }
-
-    kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_17
     }
 
     sourceSets {
@@ -78,6 +77,13 @@ android {
             signingConfig keystorePropertiesFile.exists() ? signingConfigs.release : signingConfigs.debug
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
+    }
+}
+
+// Kotlin 2.x 권장 형식 (android { kotlinOptions { } } 는 deprecated)
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
     }
 }
 
