@@ -29,11 +29,16 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: stable
-          flutter-version: "3.27.4" # ships Dart 3.6 + collection 1.19.0 to match the exact pins in pubspec.yaml
+          flutter-version: "3.44.8" # Dart 3.12; required for compileSdk 36 / AGP 8.9.1
           cache: true
 
       - name: Install dependencies
         run: flutter pub get
+
+      # 코드에 컴파일 오류가 있으면 빌드 전에 빠르게 잡아낸다.
+      # 기존 경고(FlutterFlow 생성 코드)는 빌드를 막지 않도록 제외.
+      - name: Analyze
+        run: flutter analyze --no-fatal-warnings --no-fatal-infos
 
       - name: Build release APK
         run: flutter build apk --release
