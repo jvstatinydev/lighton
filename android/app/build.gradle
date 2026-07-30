@@ -32,32 +32,31 @@ if (keystorePropertiesFile.exists()) {
 
 android {
     namespace "com.mycompany.lightonflashlight"
-    compileSdkVersion 34
-    
+    compileSdk 36
 
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
     }
 
     kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_1_8
+        jvmTarget = JavaVersion.VERSION_17
     }
 
     sourceSets {
         main.java.srcDirs += 'src/main/kotlin'
     }
 
-    lintOptions {
+    lint {
         disable 'InvalidPackage'
         checkReleaseBuilds false
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId "com.mycompany.lightonflashlight"
-        minSdkVersion 23
-        targetSdkVersion 34
+        minSdk 23
+        // Google Play: 2026-08-31 이후 업데이트는 API 36(Android 16) 이상 타깃 필요
+        targetSdk 36
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
     }
@@ -73,9 +72,10 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig signingConfigs.debug
+            // key.properties가 있으면 업로드 키로 서명, 없으면 디버그 키로 폴백해
+            // `flutter run --release`가 로컬에서 계속 동작하도록 한다.
+            // Play 업로드용 빌드는 반드시 key.properties가 있어야 한다.
+            signingConfig keystorePropertiesFile.exists() ? signingConfigs.release : signingConfigs.debug
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
@@ -83,8 +83,4 @@ android {
 
 flutter {
     source '../..'
-}
-
-dependencies {
-    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22"
 }
