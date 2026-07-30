@@ -44,6 +44,9 @@ app.*.map.json
 **/ios/Flutter/.last_build_id
 **/ios/Flutter/Generated.xcconfig
 **/ios/Flutter/flutter_export_environment.sh
+# flutter pub get이 생성하는 로컬 경로 파일 (머신마다 다름)
+**/ios/Flutter/ephemeral/
+**/macos/Flutter/ephemeral/
 **/Flutter/App.framework/
 **/Flutter/Flutter.framework/
 **/Flutter/Flutter.podspec
