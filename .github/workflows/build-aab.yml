@@ -19,7 +19,7 @@ on:
         required: false
         default: ""
       build_number:
-        description: "버전 코드 — Play에 이미 올라간 것보다 반드시 커야 함 (비우면 pubspec.yaml 값 사용). 예: 7"
+        description: "버전 코드 — Play에 이미 올라간 것보다 반드시 커야 함 (비우면 pubspec.yaml 값 사용). 예: 10"
         required: false
         default: ""
 
