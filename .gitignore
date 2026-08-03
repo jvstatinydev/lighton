@@ -1,0 +1,64 @@
+# ── 절대 커밋하면 안 되는 것 (공개 저장소) ─────────────────────────
+# 서명 키 / 키스토어
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.pem
+*.der
+# 서명 키 비밀번호가 담기는 파일
+**/key.properties
+# 로컬 SDK 경로 등
+**/local.properties
+# 환경변수 / 시크릿
+.env
+.env.*
+!.env.example
+secrets.json
+service-account*.json
+# Firebase / GCP 설정 (프로젝트 식별자 및 클라이언트 키 포함)
+**/google-services.json
+**/GoogleService-Info.plist
+
+# ── Flutter / Dart ────────────────────────────────────────────────
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+/build/
+coverage/
+**/doc/api/
+app.*.symbols
+app.*.map.json
+
+# ── Android ───────────────────────────────────────────────────────
+/android/.gradle/
+/android/app/debug/
+/android/app/profile/
+/android/app/release/
+*.class
+
+# ── iOS / macOS ───────────────────────────────────────────────────
+**/ios/Flutter/.last_build_id
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/flutter_export_environment.sh
+# flutter pub get이 생성하는 로컬 경로 파일 (머신마다 다름)
+**/ios/Flutter/ephemeral/
+**/macos/Flutter/ephemeral/
+**/Flutter/App.framework/
+**/Flutter/Flutter.framework/
+**/Flutter/Flutter.podspec
+**/Pods/
+.DS_Store
+
+# ── 에디터 / IDE ──────────────────────────────────────────────────
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+*.swp
+*.log
+.history
