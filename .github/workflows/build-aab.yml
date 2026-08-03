@@ -12,12 +12,13 @@ name: Build Play Store AAB
 # 시크릿은 로그에 마스킹되며, 키 파일은 빌드가 끝나면 삭제된다.
 
 on:
-  # 태그를 밀면 그 태그가 가리키는 커밋으로 빌드한다.
   # workflow_dispatch는 워크플로 파일이 기본 브랜치(flutterflow)에 있어야만
-  # Actions 탭에 나타나므로, 작업 브랜치에서 바로 빌드하려면 이 태그 방식을 쓴다.
+  # Actions 탭에 나타나고 실행할 수 있다. 이 파일이 아직 기본 브랜치에 없어서
+  # 작업 브랜치에 푸시할 때 빌드가 돌도록 push 트리거를 둔다.
+  # flutterflow로 머지된 뒤에는 이 push 트리거를 지우고 수동 실행만 남겨도 된다.
   push:
-    tags:
-      - "aab-*"
+    branches:
+      - claude/opus5-vs-sonnet-model-e1gwqe
   workflow_dispatch:
     inputs:
       build_name:
