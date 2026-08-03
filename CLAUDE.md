@@ -32,9 +32,17 @@ Google Play requires target API 36 (Android 16) for updates published after 2026
 | Workflow | Output | Signing | Use |
 |---|---|---|---|
 | `build-apk.yml` | `.apk` | debug key | sideload onto a phone to check behavior |
-| `build-aab.yml` | `.aab` | upload key from GitHub Secrets | Play Console upload |
+| `build-aab.yml` | `.aab` | upload key from GitHub Secrets | Play Console upload, and optionally the upload itself |
 
 `build-aab.yml` reads `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`; it fails fast if any is missing and deletes the restored keystore with `if: always()`.
+
+**Publishing to Play from CI** — `build-aab.yml` can push the AAB to Play itself via the Google Play Developer API, so a release needs no local toolchain and no browser:
+
+```bash
+gh workflow run build-aab.yml -f track=internal -f build_number=10
+```
+
+The `track` input defaults to `none`, which keeps the historical behavior (build the artifact, upload nothing). Any other value (`internal`/`alpha`/`beta`/`production`) turns on the upload step and requires a fifth secret, `PLAY_SERVICE_ACCOUNT_JSON` — the full JSON key of a Play Console service account, checked before the build so a missing secret fails in seconds rather than after a ten-minute build. `release_status=draft` stages the release in Play Console without releasing it, which is the safe way to drive `track=production`. Release notes are optional (`release_notes`, `release_notes_locale`); the locale must be one the store listing actually has, or the API rejects the whole upload. The uploader action is pinned by commit SHA, not tag, because it handles the service account key.
 
 Bump `version:` in `pubspec.yaml` before each release — the build number must exceed the highest version code already on Play.
 
