@@ -1,0 +1,123 @@
+name: Build Play Store AAB
+
+# Play Console에 올리는 배포용 파일(.aab)을 만든다.
+# APK 워크플로(build-apk.yml)는 폰에 바로 설치해보는 용도(디버그 키 서명)이고,
+# 이 워크플로는 실제 스토어 업로드용(업로드 키 서명)이다.
+#
+# 필요한 GitHub Secrets (Settings → Secrets and variables → Actions):
+#   ANDROID_KEYSTORE_BASE64   업로드 키(.jks) 파일을 base64 텍스트로 변환한 값
+#   ANDROID_KEYSTORE_PASSWORD 키스토어 비밀번호
+#   ANDROID_KEY_ALIAS         키 별칭 (upload)
+#   ANDROID_KEY_PASSWORD      키 비밀번호
+# 시크릿은 로그에 마스킹되며, 키 파일은 빌드가 끝나면 삭제된다.
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_name:
+        description: "버전 이름 (비우면 pubspec.yaml 값 사용). 예: 1.0.2"
+        required: false
+        default: ""
+      build_number:
+        description: "버전 코드 — Play에 이미 올라간 것보다 반드시 커야 함 (비우면 pubspec.yaml 값 사용). 예: 7"
+        required: false
+        default: ""
+
+jobs:
+  build-aab:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: "3.44.8" # Dart 3.12; required for compileSdk 36 / AGP 8.9.1
+          cache: true
+
+      # 시크릿이 하나라도 비어 있으면, 조용히 디버그 키로 서명된 쓸모없는 AAB가
+      # 나오는 대신 여기서 명확한 메시지와 함께 멈춘다.
+      - name: Check signing secrets
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          missing=""
+          [ -n "$KEYSTORE_BASE64" ]   || missing="$missing ANDROID_KEYSTORE_BASE64"
+          [ -n "$KEYSTORE_PASSWORD" ] || missing="$missing ANDROID_KEYSTORE_PASSWORD"
+          [ -n "$KEY_ALIAS" ]         || missing="$missing ANDROID_KEY_ALIAS"
+          [ -n "$KEY_PASSWORD" ]      || missing="$missing ANDROID_KEY_PASSWORD"
+          if [ -n "$missing" ]; then
+            echo "::error::업로드 키 시크릿이 없습니다:$missing"
+            echo "::error::GitHub → Settings → Secrets and variables → Actions 에서 등록해 주세요."
+            exit 1
+          fi
+
+      - name: Restore upload keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/upload-keystore.jks"
+          # key.properties는 android/ 폴더 기준으로 읽힌다 (android/app/build.gradle 참고).
+          {
+            echo "storeFile=$RUNNER_TEMP/upload-keystore.jks"
+            echo "storePassword=$KEYSTORE_PASSWORD"
+            echo "keyAlias=$KEY_ALIAS"
+            echo "keyPassword=$KEY_PASSWORD"
+          } > android/key.properties
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze --no-fatal-warnings --no-fatal-infos
+
+      - name: Build release AAB
+        env:
+          BUILD_NAME: ${{ inputs.build_name }}
+          BUILD_NUMBER: ${{ inputs.build_number }}
+        run: |
+          args=""
+          if [ -n "$BUILD_NAME" ]; then
+            args="$args --build-name=$BUILD_NAME"
+          fi
+          if [ -n "$BUILD_NUMBER" ]; then
+            args="$args --build-number=$BUILD_NUMBER"
+          fi
+          flutter build appbundle --release $args
+
+      # Play Console에 등록된 업로드 키 지문과 같은지 눈으로 확인할 수 있게 찍어둔다.
+      - name: Show signing fingerprint
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          keytool -list -v \
+            -keystore "$RUNNER_TEMP/upload-keystore.jks" \
+            -alias "$KEY_ALIAS" \
+            -storepass "$KEYSTORE_PASSWORD" | grep -E "SHA1|SHA256" || true
+
+      # 성공/실패와 무관하게 서명 재료를 지운다.
+      - name: Clean up signing material
+        if: always()
+        run: rm -f android/key.properties "$RUNNER_TEMP/upload-keystore.jks"
+
+      - name: Upload AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: light-on-flashlight-aab
+          path: build/app/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
