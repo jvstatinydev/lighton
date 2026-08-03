@@ -10,9 +10,10 @@ rootProject.buildDir = '../build'
 subprojects {
     afterEvaluate { project ->
         if (project.hasProperty("kotlin")) {
-            project.tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).all {
-                kotlinOptions {
-                    jvmTarget = "1.8"
+            // Kotlin 2.x에서 kotlinOptions는 deprecated이므로 compilerOptions 사용
+            project.tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+                compilerOptions {
+                    jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
                 }
             }
         }
@@ -24,7 +25,13 @@ subprojects {
         if (project.plugins.hasPlugin("com.android.application") ||
                 project.plugins.hasPlugin("com.android.library")) {
             project.android {
-                compileSdkVersion 34
+                compileSdk 36
+                // 플러그인 모듈의 Java 타깃을 Kotlin jvmTarget(17)과 맞춰
+                // jvm target 불일치 오류를 방지한다.
+                compileOptions {
+                    sourceCompatibility JavaVersion.VERSION_17
+                    targetCompatibility JavaVersion.VERSION_17
+                }
             }
         }
         if (project.hasProperty('android')) {
