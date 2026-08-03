@@ -1,0 +1,142 @@
+name: Check Play Store status
+
+# Play Console을 열지 않고 트랙/번들 상태를 확인한다. 읽기 전용이다.
+#
+# 트랙 조회는 API 구조상 반드시 "edit"을 하나 만들어야 하지만, 이 워크플로는
+# edits.commit을 절대 호출하지 않고 마지막에 edits.delete로 지운다. 따라서
+# Play Console의 초안이나 출시 상태에는 어떤 영향도 주지 않는다.
+#
+# 필요한 GitHub Secret:
+#   PLAY_SERVICE_ACCOUNT_JSON  build-aab.yml이 쓰는 것과 같은 서비스 계정 키
+#
+# 출력에는 버전 코드와 트랙 정보만 찍히며 비밀 값은 남지 않는다.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_code:
+        description: "기기 타겟팅을 함께 조회할 버전 코드 (비우면 건너뜀). 예: 13"
+        required: false
+        default: ""
+
+jobs:
+  status:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Play service account secret
+        env:
+          SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          if [ -z "$SERVICE_ACCOUNT_JSON" ]; then
+            echo "::error::PLAY_SERVICE_ACCOUNT_JSON 시크릿이 필요합니다."
+            exit 1
+          fi
+
+      - name: Install Google auth library
+        run: pip install --quiet google-auth requests
+
+      - name: Query Play Developer API
+        env:
+          SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          VERSION_CODE: ${{ inputs.version_code }}
+          PACKAGE_NAME: com.mycompany.lightonflashlight
+        run: |
+          python3 <<'PY'
+          import json, os, sys
+          import google.auth.transport.requests
+          from google.oauth2 import service_account
+
+          PKG = os.environ["PACKAGE_NAME"]
+          BASE = f"https://androidpublisher.googleapis.com/androidpublisher/v3/applications/{PKG}"
+
+          creds = service_account.Credentials.from_service_account_info(
+              json.loads(os.environ["SERVICE_ACCOUNT_JSON"]),
+              scopes=["https://www.googleapis.com/auth/androidpublisher"],
+          )
+          session = google.auth.transport.requests.AuthorizedSession(creds)
+
+          def call(method, url):
+              r = session.request(method, url)
+              if not r.ok:
+                  print(f"::error::{method} {url.replace(BASE, '')} -> {r.status_code} {r.text[:400]}")
+                  return None
+              return r.json() if r.text else {}
+
+          # edit을 열어야만 트랙을 읽을 수 있다. commit은 하지 않는다.
+          edit = call("POST", f"{BASE}/edits")
+          if edit is None:
+              sys.exit(1)
+          edit_id = edit["id"]
+          print(f"임시 edit 생성됨: {edit_id} (커밋하지 않고 마지막에 삭제)\n")
+
+          failed = False
+          try:
+              print("=" * 60)
+              print("트랙 상태")
+              print("=" * 60)
+              tracks = call("GET", f"{BASE}/edits/{edit_id}/tracks")
+              if tracks is None:
+                  failed = True
+              else:
+                  for t in tracks.get("tracks", []):
+                      print(f"\n[{t.get('track')}]")
+                      releases = t.get("releases", [])
+                      if not releases:
+                          print("  (릴리스 없음)")
+                      for rel in releases:
+                          codes = rel.get("versionCodes", [])
+                          print(f"  - 이름: {rel.get('name')}")
+                          print(f"    상태: {rel.get('status')}")
+                          print(f"    버전 코드: {codes}")
+                          if len(codes) > 1:
+                              print(f"    ::경고:: 버전 코드가 {len(codes)}개 들어 있습니다")
+                          notes = rel.get("releaseNotes", [])
+                          if notes:
+                              print(f"    출시 노트 로케일: {[n.get('language') for n in notes]}")
+                          else:
+                              print("    출시 노트: 없음")
+
+              print("\n" + "=" * 60)
+              print("업로드된 번들 (버전 코드)")
+              print("=" * 60)
+              bundles = call("GET", f"{BASE}/edits/{edit_id}/bundles")
+              if bundles is None:
+                  failed = True
+              else:
+                  codes = [b.get("versionCode") for b in bundles.get("bundles", [])]
+                  print(sorted(c for c in codes if c is not None))
+
+              print("\n" + "=" * 60)
+              print("스토어 등록정보 로케일")
+              print("=" * 60)
+              listings = call("GET", f"{BASE}/edits/{edit_id}/listings")
+              if listings is None:
+                  failed = True
+              else:
+                  print(sorted(l.get("language") for l in listings.get("listings", [])))
+          finally:
+              # 성공/실패와 무관하게 임시 edit을 지운다.
+              r = session.request("DELETE", f"{BASE}/edits/{edit_id}")
+              print(f"\n임시 edit 삭제됨 (HTTP {r.status_code})")
+
+          vc = os.environ.get("VERSION_CODE", "").strip()
+          if vc:
+              print("\n" + "=" * 60)
+              print(f"vc {vc} 기기 타겟팅 (지원 기기 감소 원인 조사용)")
+              print("=" * 60)
+              apks = call("GET", f"{BASE}/generatedApks/{vc}")
+              if apks is None:
+                  failed = True
+              else:
+                  for info in apks.get("generatedApks", []):
+                      targeting = info.get("targetingInfo", {})
+                      for variant in targeting.get("variant", []):
+                          vt = variant.get("variantTargeting", {})
+                          sdk = vt.get("sdkVersionTargeting", {})
+                          mins = [v.get("min", {}).get("value") for v in sdk.get("value", [])]
+                          print(f"  variant sdk min: {mins}  abi/density: "
+                                f"{list(vt.get('abiTargeting', {}).keys()) or '-'}")
+
+          if failed:
+              sys.exit(1)
+          PY
