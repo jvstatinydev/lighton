@@ -188,6 +188,8 @@ jobs:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: com.mycompany.lightonflashlight
           releaseFiles: build/app/outputs/bundle/release/app-release.aab
-          track: ${{ inputs.track }}
+          # 단수형 track은 deprecated다. tracks는 비워두면 production으로 간주되지만,
+          # 이 단계는 track이 none이 아닐 때만 도니 항상 값이 채워져 있다.
+          tracks: ${{ inputs.track }}
           status: ${{ inputs.release_status }}
           whatsNewDirectory: ${{ steps.whatsnew.outputs.dir }}
