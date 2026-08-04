@@ -8,6 +8,10 @@ name: Build Android APK
 on:
   push:
     branches:
+      # main is built on every push so the *merged* result is verified. Feature
+      # branches are only ever built against the base they branched from, so a
+      # set of individually-green PRs can still combine into a broken main.
+      - main
       - flutterflow
       - "claude/**"
   workflow_dispatch: {} # lets you trigger a build manually from the GitHub website
