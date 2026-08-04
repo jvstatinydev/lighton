@@ -33,32 +33,16 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
       debugLogDiagnostics: true,
       refreshListenable: appStateNotifier,
       navigatorKey: appNavigatorKey,
-      errorBuilder: (context, state) => appStateNotifier.showSplashImage
-          ? Builder(
-              builder: (context) => Container(
-                color: Color(0xFF837EFF),
-                child: Image.asset(
-                  'assets/images/play_store_512.png',
-                  fit: BoxFit.none,
-                ),
-              ),
-            )
-          : HomePageWidget(),
+      // 진단용: Dart 스플래시 게이트를 제거했다. 원래는 showSplashImage 가
+      // true인 동안 보라색 스플래시를 그리고, MyApp 이 1초 뒤 그 플래그를
+      // 내리면서 notifyListeners() -> refreshListenable 로 라우터를 다시
+      // 그리게 하는 구조였다. vc13과 현재 main 모두 그 화면에서 멈춘다.
+      errorBuilder: (context, state) => HomePageWidget(),
       routes: [
         FFRoute(
           name: '_initialize',
           path: '/',
-          builder: (context, _) => appStateNotifier.showSplashImage
-              ? Builder(
-                  builder: (context) => Container(
-                    color: Color(0xFF837EFF),
-                    child: Image.asset(
-                      'assets/images/play_store_512.png',
-                      fit: BoxFit.none,
-                    ),
-                  ),
-                )
-              : HomePageWidget(),
+          builder: (context, _) => HomePageWidget(),
         ),
         FFRoute(
           name: HomePageWidget.routeName,
