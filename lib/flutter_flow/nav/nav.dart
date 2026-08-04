@@ -19,13 +19,6 @@ class AppStateNotifier extends ChangeNotifier {
 
   static AppStateNotifier? _instance;
   static AppStateNotifier get instance => _instance ??= AppStateNotifier._();
-
-  bool showSplashImage = true;
-
-  void stopShowingSplashImage() {
-    showSplashImage = false;
-    notifyListeners();
-  }
 }
 
 GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
@@ -33,32 +26,18 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
       debugLogDiagnostics: true,
       refreshListenable: appStateNotifier,
       navigatorKey: appNavigatorKey,
-      errorBuilder: (context, state) => appStateNotifier.showSplashImage
-          ? Builder(
-              builder: (context) => Container(
-                color: Color(0xFF837EFF),
-                child: Image.asset(
-                  'assets/images/play_store_512.png',
-                  fit: BoxFit.none,
-                ),
-              ),
-            )
-          : HomePageWidget(),
+      // 여기에는 원래 Dart 스플래시 게이트가 있었다. showSplashImage 가 true인
+      // 동안 보라색 이미지를 그리고, MyApp 이 1초 뒤 그 값을 false 로 바꾸며
+      // notifyListeners() -> refreshListenable 로 라우터를 다시 그리게 하는
+      // 구조였다. 그 재빌드가 일어나지 않아 앱이 스플래시에서 영영 멈췄다.
+      // 네이티브 스플래시(flutter_native_splash)가 이미 시작 화면을 담당하므로
+      // 이 게이트는 지우고 곧장 홈으로 간다.
+      errorBuilder: (context, state) => HomePageWidget(),
       routes: [
         FFRoute(
           name: '_initialize',
           path: '/',
-          builder: (context, _) => appStateNotifier.showSplashImage
-              ? Builder(
-                  builder: (context) => Container(
-                    color: Color(0xFF837EFF),
-                    child: Image.asset(
-                      'assets/images/play_store_512.png',
-                      fit: BoxFit.none,
-                    ),
-                  ),
-                )
-              : HomePageWidget(),
+          builder: (context, _) => HomePageWidget(),
         ),
         FFRoute(
           name: HomePageWidget.routeName,
