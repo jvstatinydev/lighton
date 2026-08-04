@@ -1,0 +1,201 @@
+name: Fix Play release name
+
+# 이미 게시된 릴리스의 "출시 이름"(라벨)만 고친다. APK/AAB를 새로 올리지 않고,
+# 버전 코드·출시 상태·출시 노트·단계적 출시 비율은 그대로 둔다.
+#
+# 쓰임새: vc 13이 1.0.3인데 Play Console의 출시 이름이 1.0.2로 남아 있는 것처럼,
+# 라벨만 실제 버전과 어긋난 경우를 바로잡는다.
+#
+# 안전 장치
+#   - 기본값은 미리보기(apply=false)다. 무엇이 어떻게 바뀌는지만 출력하고
+#     edits.delete로 임시 edit을 지운다. Play Console에는 아무 영향이 없다.
+#   - apply=true 일 때만 edits.commit 을 호출한다. 이때 confirm 입력에
+#     대상 버전 코드를 정확히 다시 적어야 진행된다(오조작 방지).
+#   - 이름을 바꿀 릴리스는 version_code 로 지목한다. 트랙에서 그 버전 코드를
+#     가진 릴리스가 정확히 하나가 아니면 중단한다.
+#   - name 외의 필드는 API가 돌려준 값을 그대로 되돌려 보낸다.
+#
+# 필요한 GitHub Secret:
+#   PLAY_SERVICE_ACCOUNT_JSON  build-aab.yml / play-status.yml 과 같은 서비스 계정 키
+
+on:
+  workflow_dispatch:
+    inputs:
+      track:
+        description: "대상 트랙"
+        required: true
+        default: production
+        type: choice
+        options: [production, beta, alpha, internal]
+      version_code:
+        description: "이름을 고칠 릴리스의 버전 코드. 예: 13"
+        required: true
+      release_name:
+        description: "새 출시 이름. 예: 1.0.3"
+        required: true
+      apply:
+        description: "실제로 반영한다. 비워 두면 미리보기만 한다."
+        required: false
+        default: false
+        type: boolean
+      confirm:
+        description: "apply=true 일 때만 필요. 대상 버전 코드를 그대로 다시 입력."
+        required: false
+        default: ""
+      changes_not_sent_for_review:
+        description: "커밋 시 검토로 보내지 않는다. 보통은 비워 둔다."
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  rename:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Play service account secret
+        env:
+          SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          if [ -z "$SERVICE_ACCOUNT_JSON" ]; then
+            echo "::error::PLAY_SERVICE_ACCOUNT_JSON 시크릿이 필요합니다."
+            exit 1
+          fi
+
+      - name: Install Google auth library
+        run: pip install --quiet google-auth requests
+
+      - name: Patch release name
+        env:
+          SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          PACKAGE_NAME: com.mycompany.lightonflashlight
+          TRACK: ${{ inputs.track }}
+          VERSION_CODE: ${{ inputs.version_code }}
+          RELEASE_NAME: ${{ inputs.release_name }}
+          APPLY: ${{ inputs.apply }}
+          CONFIRM: ${{ inputs.confirm }}
+          NO_REVIEW: ${{ inputs.changes_not_sent_for_review }}
+        run: |
+          python3 <<'PY'
+          import json, os, sys
+          import google.auth.transport.requests
+          from google.oauth2 import service_account
+
+          PKG = os.environ["PACKAGE_NAME"]
+          BASE = f"https://androidpublisher.googleapis.com/androidpublisher/v3/applications/{PKG}"
+          TRACK = os.environ["TRACK"]
+          NEW_NAME = os.environ["RELEASE_NAME"].strip()
+          APPLY = os.environ["APPLY"].lower() == "true"
+          CONFIRM = os.environ.get("CONFIRM", "").strip()
+          NO_REVIEW = os.environ["NO_REVIEW"].lower() == "true"
+
+          try:
+              VC = int(os.environ["VERSION_CODE"].strip())
+          except ValueError:
+              print("::error::version_code 는 정수여야 합니다.")
+              sys.exit(1)
+
+          if not NEW_NAME:
+              print("::error::release_name 이 비어 있습니다.")
+              sys.exit(1)
+
+          # 실제 반영은 버전 코드를 다시 입력해야만 진행한다.
+          if APPLY and CONFIRM != str(VC):
+              print(f"::error::apply=true 이면 confirm 에 대상 버전 코드({VC})를 "
+                    f"그대로 입력해야 합니다. 받은 값: {CONFIRM!r}")
+              sys.exit(1)
+
+          creds = service_account.Credentials.from_service_account_info(
+              json.loads(os.environ["SERVICE_ACCOUNT_JSON"]),
+              scopes=["https://www.googleapis.com/auth/androidpublisher"],
+          )
+          session = google.auth.transport.requests.AuthorizedSession(creds)
+
+          def call(method, url, **kw):
+              r = session.request(method, url, **kw)
+              if not r.ok:
+                  print(f"::error::{method} {url.replace(BASE, '')} -> "
+                        f"{r.status_code} {r.text[:400]}")
+                  return None
+              return r.json() if r.text else {}
+
+          edit = call("POST", f"{BASE}/edits")
+          if edit is None:
+              sys.exit(1)
+          edit_id = edit["id"]
+          print(f"임시 edit 생성됨: {edit_id}\n")
+
+          committed = False
+          try:
+              track = call("GET", f"{BASE}/edits/{edit_id}/tracks/{TRACK}")
+              if track is None:
+                  sys.exit(1)
+
+              releases = track.get("releases", [])
+              matches = [r for r in releases if VC in
+                         [int(c) for c in r.get("versionCodes", [])]]
+
+              if len(matches) != 1:
+                  print(f"::error::트랙 '{TRACK}' 에서 버전 코드 {VC} 를 가진 릴리스가 "
+                        f"{len(matches)}개입니다. 정확히 1개여야 진행합니다.")
+                  for r in releases:
+                      print(f"  - name={r.get('name')!r} "
+                            f"status={r.get('status')} codes={r.get('versionCodes')}")
+                  sys.exit(1)
+
+              target = matches[0]
+              old_name = target.get("name")
+
+              print("=" * 60)
+              print("변경 내용")
+              print("=" * 60)
+              print(f"  트랙       : {TRACK}")
+              print(f"  버전 코드  : {VC}")
+              print(f"  출시 이름  : {old_name!r}  ->  {NEW_NAME!r}")
+              print(f"  출시 상태  : {target.get('status')} (변경 없음)")
+              notes = target.get("releaseNotes", [])
+              print(f"  출시 노트  : {len(notes)}개 로케일 (변경 없음)")
+              if "userFraction" in target:
+                  print(f"  단계 비율  : {target['userFraction']} (변경 없음)")
+              print()
+
+              if old_name == NEW_NAME:
+                  print("이미 원하는 이름입니다. 변경할 것이 없어 종료합니다.")
+                  sys.exit(0)
+
+              # name 만 바꾸고 나머지 필드는 받은 그대로 되돌려 보낸다.
+              target["name"] = NEW_NAME
+
+              if not APPLY:
+                  print("미리보기 모드입니다 (apply=false). 아무것도 반영하지 않았습니다.")
+                  print("실제로 반영하려면 apply=true 로, confirm 에 "
+                        f"{VC} 를 입력해 다시 실행하세요.")
+                  sys.exit(0)
+
+              patched = call(
+                  "PUT",
+                  f"{BASE}/edits/{edit_id}/tracks/{TRACK}",
+                  json={"track": TRACK, "releases": releases},
+              )
+              if patched is None:
+                  sys.exit(1)
+
+              commit_url = f"{BASE}/edits/{edit_id}:commit"
+              if NO_REVIEW:
+                  commit_url += "?changesNotSentForReview=true"
+              result = call("POST", commit_url)
+              if result is None:
+                  sys.exit(1)
+
+              committed = True
+              print("=" * 60)
+              print(f"반영 완료. 출시 이름이 {NEW_NAME!r} 로 바뀌었습니다.")
+              print("=" * 60)
+              for r in patched.get("releases", []):
+                  print(f"  name={r.get('name')!r} "
+                        f"status={r.get('status')} codes={r.get('versionCodes')}")
+          finally:
+              # 커밋했다면 edit은 이미 소비됐다. 그 외에는 반드시 지운다.
+              if not committed:
+                  r = session.request("DELETE", f"{BASE}/edits/{edit_id}")
+                  print(f"\n임시 edit 삭제됨 (HTTP {r.status_code})")
+          PY

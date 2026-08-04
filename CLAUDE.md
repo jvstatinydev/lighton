@@ -21,6 +21,7 @@ What the FlutterFlow heritage still means in practice:
 Google Play requires target API 36 (Android 16) for updates published after 2026-08-31, and the toolchain is pinned to what that needs:
 
 - `compileSdk` / `targetSdk` **36**, `minSdk` 23, `ndkVersion 28.2.13676358` — `android/app/build.gradle`
+- **The shipped `minSdk` is 24, not the 23 declared above.** `google_mobile_ads` declares `minSdk 24` in its own `android/build.gradle`, and manifest merging takes the highest value, so the AAB Play receives targets API 24. The plugin raised it in **7.0.0** (5.1.0 was 21, 6.0.0 was 23, 7.0.0 onward is 24); the Google Mobile Ads Android SDK itself is unaffected — `play-services-ads` AARs still declare `minSdkVersion="23"`. This is what dropped ~1,195 supported devices (all Android 6.0 / API 23) when the dependency was updated, and it is why Play Console warned about lost device support. Nothing in the plugin changelog records the bump; only its `build.gradle` does. Reverting means giving up the ads SDK that target API 36 compliance needs, so the bump is accepted rather than worked around — do not try to force API 23 back with `tools:overrideLibrary`, since the SDK genuinely requires 24 at runtime.
 - AGP **8.11.1**, Kotlin **2.3.20** — `android/settings.gradle`. Kotlin is ahead of Flutter's minimum because `play-services-ads` 25.3.0 ships Kotlin 2.3.0 metadata.
 - Gradle **8.14** — `android/gradle/wrapper/gradle-wrapper.properties`. Gradle 9 removed `Project.buildDir`, which `android/build.gradle` still uses, so 9.x needs separate work first.
 - Java/JVM target 17 everywhere (app module plus the `subprojects` block in `android/build.gradle`).
@@ -33,6 +34,12 @@ Google Play requires target API 36 (Android 16) for updates published after 2026
 |---|---|---|---|
 | `build-apk.yml` | `.apk` | debug key | sideload onto a phone to check behavior |
 | `build-aab.yml` | `.aab` | upload key from GitHub Secrets | Play Console upload, and optionally the upload itself |
+| `play-status.yml` | console output | — | read-only Play track/bundle/listing query, no local browser needed |
+| `play-release-name.yml` | console output | — | fix a published release's **name label** only, without uploading anything |
+
+`build-apk.yml` runs on every push to `claude/**`. Its Analyze step uses `--no-fatal-warnings --no-fatal-infos`, so **a green run does not mean the code is warning-free** — read the step's `N issues found` line before claiming analyzer warnings are fixed.
+
+`play-status.yml` and `play-release-name.yml` both authenticate with `PLAY_SERVICE_ACCOUNT_JSON` and open a Play "edit" because the API requires one. `play-status.yml` never commits and always deletes the edit, so it is read-only. `play-release-name.yml` defaults to `apply=false` (preview only, edit deleted) and commits only when `apply=true` *and* `confirm` repeats the target version code.
 
 `build-aab.yml` reads `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`; it fails fast if any is missing and deletes the restored keystore with `if: always()`.
 
