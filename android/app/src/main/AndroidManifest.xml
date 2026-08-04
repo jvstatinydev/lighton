@@ -35,35 +35,9 @@
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
     <meta-data android:name="flutterEmbedding" android:value="2"/>
     <meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="ca-app-pub-3228085068090706~2375958262"/>
-    <!-- Start of localization support -->
-    <!-- 한국어 -->
-    <activity-alias android:name=".AliasKorean" android:targetActivity=".MainActivity" android:label="손전등" android:exported="true"/>
-    <!-- 일본어 -->
-    <activity-alias android:name=".AliasJapanese" android:targetActivity=".MainActivity" android:label="懐中電灯" android:exported="true"/>
-    <!-- 중국어 간체 -->
-    <activity-alias android:name=".AliasChineseSimplified" android:targetActivity=".MainActivity" android:label="手电筒" android:exported="true"/>
-    <!-- 프랑스어 -->
-    <activity-alias android:name=".AliasFrench" android:targetActivity=".MainActivity" android:label="Lampe de poche" android:exported="true"/>
-    <!-- 프랑스어 -->
-    <activity-alias android:name=".AliasFrench2" android:targetActivity=".MainActivity" android:label="torche" android:exported="true"/>
-    <!-- 독일어 -->
-    <activity-alias android:name=".AliasGerman" android:targetActivity=".MainActivity" android:label="Taschenlampe" android:exported="true"/>
-    <!-- 스페인어 -->
-    <activity-alias android:name=".AliasSpanish" android:targetActivity=".MainActivity" android:label="Linterna" android:exported="true"/>
-    <!-- 러시아어 -->
-    <activity-alias android:name=".AliasRussian" android:targetActivity=".MainActivity" android:label="Фонарик" android:exported="true"/>
-    <!-- 아랍어 (RTL 언어) -->
-    <activity-alias android:name=".AliasArabic" android:targetActivity=".MainActivity" android:label="مصباح يدوي كشاف" android:exported="true"/>
-    <!-- 힌디어 -->
-    <activity-alias android:name=".AliasHindi" android:targetActivity=".MainActivity" android:label="टॉर्च" android:exported="true"/>
-    <!-- 포르투갈어 -->
-    <activity-alias android:name=".AliasPortuguese" android:targetActivity=".MainActivity" android:label="Lanterna" android:exported="true"/>
-    <activity-alias android:name=".AliasVietnamese" android:targetActivity=".MainActivity" android:label="Đèn pin" android:exported="true"/>
-    <activity-alias android:name=".AliasItalian" android:targetActivity=".MainActivity" android:label="Torcia elettrica" android:exported="true"/>
-    <activity-alias android:name=".AliasIndonesian" android:targetActivity=".MainActivity" android:label="Senter" android:exported="true"/>
-    <activity-alias android:name=".AliasThai" android:targetActivity=".MainActivity" android:label="ไฟฉาย" android:exported="true"/>
-    <activity-alias android:name=".AliasTurkish" android:targetActivity=".MainActivity" android:label="El Feneri" android:exported="true"/>
-    <activity-alias android:name=".AliasPolish" android:targetActivity=".MainActivity" android:label="latarka" android:exported="true"/>
-    <!-- End of localization support -->
+    <!-- 언어별 앱 이름은 res/values-XX/strings.xml 의 app_name 이 담당한다.
+             (application 의 android:label="@string/app_name" 이 그것을 참조한다)
+             예전에는 같은 목적으로 activity-alias 를 나열했지만, MAIN/LAUNCHER
+             intent-filter 가 없어 런처에 노출되지 않는 죽은 선언이었으므로 제거했다. -->
   </application>
 </manifest>
