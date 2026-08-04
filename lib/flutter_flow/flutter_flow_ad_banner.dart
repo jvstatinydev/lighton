@@ -90,7 +90,7 @@ class _FlutterFlowAdBannerState extends State<FlutterFlowAdBanner> {
             height: widget.height!.toInt(),
             width: widget.width!.toInt(),
           )
-        : await AdSize.getAnchoredAdaptiveBannerAdSize(
+        : await AdSize.getLargeAnchoredAdaptiveBannerAdSizeWithOrientation(
             widget.width == null ? Orientation.portrait : Orientation.landscape,
             widget.width == null
                 ? MediaQuery.sizeOf(context).width.truncate()
