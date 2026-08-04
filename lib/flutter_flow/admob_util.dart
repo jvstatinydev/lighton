@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:io' show Platform;
 
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 export 'package:google_mobile_ads/google_mobile_ads.dart';
 
@@ -87,35 +87,75 @@ Future<bool> showInterstitialAd() async {
   return completer.future;
 }
 
-void adMobRequestConsent() {
+// EEA(유럽 경제 지역) 사용자에게 AdMob이 요구하는 UMP 동의 흐름.
+// https://developers.google.com/admob/flutter/privacy
+//
+// 앱 시작 시 한 번 호출한다(lib/main.dart). 진행 순서는
+//   1) 동의 정보 갱신 요청
+//   2) 동의가 필요한 지역이면 동의 양식 표시
+//   3) 광고를 요청해도 되는 상태이면 광고 SDK 초기화
+// 이며, 어느 단계가 실패해도 예외를 던지지 않고 로그만 남긴다.
+// 동의 여부나 네트워크 상태와 무관하게 앱의 나머지 기능(손전등)은 그대로
+// 동작해야 하므로, 호출 측은 이 Future를 기다리지 않아도 된다.
+Future<void> adMobRequestConsent() async {
   if (kIsWeb) {
-    print('AdMob is not supported on web.');
+    debugPrint('AdMob is not supported on web.');
     return;
   }
 
-  ConsentRequestParameters params = ConsentRequestParameters();
-
-  ConsentInformation.instance.requestConsentInfoUpdate(params, () async {
-    if (await ConsentInformation.instance.isConsentFormAvailable()) {
-      loadForm();
-    }
-  }, (error) {});
+  await _gatherConsent();
+  await _initializeAdsIfAllowed();
 }
 
-void loadForm() {
-  ConsentForm.loadConsentForm((consentForm) async {
-    var status = await ConsentInformation.instance.getConsentStatus();
-    if (status == ConsentStatus.required) {
-      consentForm.show((error) {
-        loadForm();
-      });
+/// 동의 정보를 갱신하고, 필요한 경우 동의 양식을 띄운다.
+///
+/// 성공/실패 여부와 관계없이 흐름이 끝나면 완료되는 Future를 돌려준다.
+Future<void> _gatherConsent() {
+  final completer = Completer<void>();
+  void finish() {
+    if (!completer.isCompleted) {
+      completer.complete();
     }
-  }, (error) {});
+  }
+
+  ConsentInformation.instance.requestConsentInfoUpdate(
+    ConsentRequestParameters(),
+    () async {
+      // 동의가 필요한 지역에서만 양식이 뜬다. 필요 없으면 바로 콜백된다.
+      try {
+        await ConsentForm.loadAndShowConsentFormIfRequired((FormError? error) {
+          if (error != null) {
+            debugPrint(
+                'AdMob consent form failed: [${error.errorCode}] ${error.message}');
+          }
+          finish();
+        });
+      } catch (e) {
+        debugPrint('AdMob consent form threw: $e');
+        finish();
+      }
+    },
+    (FormError error) {
+      debugPrint(
+          'AdMob consent info update failed: [${error.errorCode}] ${error.message}');
+      finish();
+    },
+  );
+
+  return completer.future;
 }
 
-Future<bool> checkConsentNotRequired() async {
-  var status = await ConsentInformation.instance.getConsentStatus();
-  return status == ConsentStatus.notRequired;
+/// 동의 결과상 광고 요청이 허용될 때만 광고 SDK를 초기화한다.
+Future<void> _initializeAdsIfAllowed() async {
+  try {
+    if (await ConsentInformation.instance.canRequestAds()) {
+      await MobileAds.instance.initialize();
+    } else {
+      debugPrint('AdMob: consent not obtained, skipping ads initialization.');
+    }
+  } catch (e) {
+    debugPrint('AdMob initialization failed: $e');
+  }
 }
 
 void adMobUpdateRequestConfiguration() {

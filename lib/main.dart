@@ -1,8 +1,11 @@
+import 'dart:async' show unawaited;
+
 import 'package:provider/provider.dart';
 import 'package:flutter/material.dart';
 
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
+import '/flutter_flow/admob_util.dart' show adMobRequestConsent;
 import '/flutter_flow/flutter_flow_theme.dart';
 import 'flutter_flow/flutter_flow_util.dart';
 import 'flutter_flow/internationalization.dart';
@@ -22,6 +25,11 @@ void main() async {
 
   final appState = FFAppState(); // Initialize FFAppState
   await appState.initializePersistedState();
+
+  // EEA 사용자를 위한 AdMob 동의(UMP) 흐름. 배너가 광고를 요청하기 전에 최대한
+  // 일찍 시작하되, 네트워크가 없거나 동의를 거부해도 손전등 기능이 막히면 안
+  // 되므로 완료를 기다리지 않는다(실패는 admob_util 안에서 로그로만 남는다).
+  unawaited(adMobRequestConsent());
 
   runApp(ChangeNotifierProvider(
     create: (context) => appState,
