@@ -59,7 +59,7 @@ class _HomePageWidgetState extends State<HomePageWidget>
         }
       }
 
-      FFAppState().isFlashOn = !(FFAppState().isFlashOn ?? true);
+      FFAppState().isFlashOn = !FFAppState().isFlashOn;
       safeSetState(() {});
       await Future.delayed(const Duration(milliseconds: 100));
       if (FFAppState().isFlashOn) {
@@ -78,7 +78,7 @@ class _HomePageWidgetState extends State<HomePageWidget>
         }
       }
 
-      FFAppState().isFlashOn = !(FFAppState().isFlashOn ?? true);
+      FFAppState().isFlashOn = !FFAppState().isFlashOn;
       safeSetState(() {});
     });
 
@@ -363,20 +363,9 @@ class _HomePageWidgetState extends State<HomePageWidget>
                     ],
                   ).animateOnPageLoad(animationsMap['rowOnPageLoadAnimation']!),
                 ),
-                Expanded(
-                  flex: 1,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.max,
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      FlutterFlowAdBanner(
-                        showsTestAd: false,
-                        androidAdUnitID:
-                            'ca-app-pub-3228085068090706/4930787659',
-                      ),
-                    ],
-                  ),
+                FlutterFlowAdBanner(
+                  showsTestAd: false,
+                  androidAdUnitID: 'ca-app-pub-3228085068090706/4930787659',
                 ),
               ],
             ),
