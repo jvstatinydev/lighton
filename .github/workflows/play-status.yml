@@ -10,6 +10,11 @@ name: Check Play Store status
 #   PLAY_SERVICE_ACCOUNT_JSON  build-aab.yml이 쓰는 것과 같은 서비스 계정 키
 #
 # 출력에는 버전 코드와 트랙 정보만 찍히며 비밀 값은 남지 않는다.
+#
+# probe 입력으로 "지원 기기 감소" 원인 조사용 진단을 함께 돌릴 수 있다.
+#   maven — Google Maven에서 광고 SDK AAR을 받아 uses-sdk / uses-feature를 덤프
+#   build — 릴리스 APK를 빌드해 매니페스트 병합 리포트와 aapt2 badging을 덤프
+# 둘 다 읽기 전용이며 Play에는 아무것도 올리지 않는다.
 
 on:
   workflow_dispatch:
@@ -18,9 +23,25 @@ on:
         description: "기기 타겟팅을 함께 조회할 버전 코드 (비우면 건너뜀). 예: 13"
         required: false
         default: ""
+      skip_play_api:
+        description: "Play Developer API 조회를 건너뛴다 (진단만 돌릴 때)"
+        type: boolean
+        required: false
+        default: false
+      probe:
+        description: "지원 기기 감소 원인 진단"
+        type: choice
+        required: false
+        default: none
+        options:
+          - none
+          - maven
+          - build
+          - both
 
 jobs:
   status:
+    if: ${{ !inputs.skip_play_api }}
     runs-on: ubuntu-latest
     steps:
       - name: Check Play service account secret
@@ -124,19 +145,137 @@ jobs:
               print("\n" + "=" * 60)
               print(f"vc {vc} 기기 타겟팅 (지원 기기 감소 원인 조사용)")
               print("=" * 60)
-              apks = call("GET", f"{BASE}/generatedApks/{vc}")
-              if apks is None:
+              # 파싱 실수와 API가 정말 값을 주지 않는 경우를 구분하려면 원문이 필요하다.
+              r = session.request("GET", f"{BASE}/generatedApks/{vc}")
+              print(f"GET /generatedApks/{vc} -> HTTP {r.status_code}")
+              print("--- 응답 원문 (앞 20000자) ---")
+              print(r.text[:20000])
+              print("--- 응답 원문 끝 ---")
+              if not r.ok:
                   failed = True
-              else:
-                  for info in apks.get("generatedApks", []):
-                      targeting = info.get("targetingInfo", {})
-                      for variant in targeting.get("variant", []):
-                          vt = variant.get("variantTargeting", {})
-                          sdk = vt.get("sdkVersionTargeting", {})
-                          mins = [v.get("min", {}).get("value") for v in sdk.get("value", [])]
-                          print(f"  variant sdk min: {mins}  abi/density: "
-                                f"{list(vt.get('abiTargeting', {}).keys()) or '-'}")
+
+              # 기기 계층 설정도 지원 기기 목록에 영향을 줄 수 있으므로 함께 본다.
+              r2 = session.request("GET", f"{BASE}/deviceTierConfigs")
+              print(f"\nGET /deviceTierConfigs -> HTTP {r2.status_code}")
+              print(r2.text[:4000])
 
           if failed:
               sys.exit(1)
           PY
+
+  probe-maven:
+    # Google Maven에서 광고/UMP SDK의 AAR을 직접 받아 매니페스트를 덤프한다.
+    # 로컬 환경에서는 dl.google.com이 막혀 있어 CI에서만 확인할 수 있다.
+    if: ${{ inputs.probe == 'maven' || inputs.probe == 'both' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dump AAR manifests from Google Maven
+        run: |
+          set -uo pipefail
+          work="$RUNNER_TEMP/maven"
+          mkdir -p "$work"
+          cd "$work"
+          probe() {
+            group_path="$1"; artifact="$2"; version="$3"
+            base="https://dl.google.com/dl/android/maven2/${group_path}/${artifact}/${version}"
+            echo ""
+            echo "=================================================="
+            echo "${artifact}:${version}"
+            echo "=================================================="
+            if curl -fsSL "${base}/${artifact}-${version}.pom" -o pom.xml; then
+              echo "--- POM (packaging / dependencies) ---"
+              grep -E "<packaging>|<artifactId>|<version>" pom.xml | head -80
+            else
+              echo "  POM 다운로드 실패"
+            fi
+            if curl -fsSL "${base}/${artifact}-${version}.aar" -o lib.aar; then
+              echo "--- AAR AndroidManifest.xml ---"
+              unzip -p lib.aar AndroidManifest.xml
+            else
+              echo "  AAR 없음 (packaging이 aar이 아니거나 다운로드 실패)"
+            fi
+          }
+          # 현재(google_mobile_ads 9.0.0) 체인
+          probe com/google/android/gms play-services-ads 25.3.0
+          probe com/google/android/gms play-services-ads-lite 25.3.0
+          probe com/google/android/gms play-services-ads-base 25.3.0
+          probe com/google/android/ump user-messaging-platform 4.0.0
+          # 과거(google_mobile_ads 5.1.0) 체인 — 비교용
+          probe com/google/android/gms play-services-ads 23.0.0
+          probe com/google/android/gms play-services-ads-lite 23.0.0
+          probe com/google/android/gms play-services-ads-base 23.0.0
+          probe com/google/android/ump user-messaging-platform 2.2.0
+          # 중간 지점 — 플러그인이 minSdk 24로 올라간 7.0.0의 조합
+          probe com/google/android/gms play-services-ads 24.9.0
+          probe com/google/android/gms play-services-ads 24.1.0
+
+  probe-build:
+    # 실제 릴리스 APK를 빌드해 "병합된" 매니페스트가 무엇을 요구하는지 본다.
+    # 매니페스트 병합 리포트가 minSdk / uses-feature를 누가 넣었는지 알려준다.
+    if: ${{ inputs.probe == 'build' || inputs.probe == 'both' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: "3.44.8"
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build release APK
+        run: flutter build apk --release
+
+      - name: Dump merged manifest facts
+        run: |
+          set -uo pipefail
+          apk=build/app/outputs/flutter-apk/app-release.apk
+          echo "=================================================="
+          echo "aapt2 dump badging"
+          echo "=================================================="
+          aapt2=$(ls -d "$ANDROID_HOME"/build-tools/*/aapt2 2>/dev/null | tail -1)
+          echo "aapt2: $aapt2"
+          "$aapt2" dump badging "$apk" | grep -E "^(package|sdkVersion|targetSdkVersion|uses-feature|uses-implied-feature|uses-permission|uses-implied-permission|native-code|alt-native-code|compatible-screens|supports-screens|supports-any-density)" || true
+
+          echo ""
+          echo "=================================================="
+          echo "APK 안의 네이티브 ABI 디렉터리"
+          echo "=================================================="
+          unzip -l "$apk" | grep -oE "lib/[^/]+/" | sort -u || true
+
+          echo ""
+          echo "=================================================="
+          echo "매니페스트 병합 리포트 (uses-sdk / uses-feature 관련)"
+          echo "=================================================="
+          report=$(ls build/app/outputs/logs/manifest-merger-release-report.txt 2>/dev/null || true)
+          if [ -z "$report" ]; then
+            report=$(find . -name "manifest-merger-release-report.txt" | head -1)
+          fi
+          echo "report: ${report:-없음}"
+          if [ -n "$report" ]; then
+            grep -n -i -E "minSdk|uses-sdk|uses-feature|glEs" "$report" | head -200 || true
+            echo ""
+            echo "--- 리포트 앞부분 120줄 ---"
+            head -120 "$report"
+          fi
+
+          echo ""
+          echo "=================================================="
+          echo "최종 병합 매니페스트 (uses-sdk / uses-feature 노드)"
+          echo "=================================================="
+          merged=$(find . -path "*intermediates/merged_manifest*" -name AndroidManifest.xml | head -1)
+          echo "merged: ${merged:-없음}"
+          if [ -n "$merged" ]; then
+            grep -E "uses-sdk|uses-feature|glEsVersion" "$merged" || true
+          fi
