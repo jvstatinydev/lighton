@@ -89,6 +89,13 @@ This bit us once: the mipmaps sat at Flutter's default icon for the project's wh
 
 **Internationalization** — `lib/flutter_flow/internationalization.dart` (`FFLocalizations`) provides string lookups keyed per-page; the language selector widget lives in `flutter_flow/`.
 
+## Skills
+
+`.claude/skills/` carries two skills with the vendor documentation bundled offline, so neither needs network access or a login to answer questions:
+
+- **`play-release`** — Google Play Developer API v3. The Play Console web UI is unreachable here (an anonymous session is redirected to the marketing page), so all Play work goes through the API instead. Bundles the machine-readable discovery spec (`revision 20260803`, 143 methods / 383 schemas), a generated method reference, and the prose guides. Use it when touching `build-aab.yml`, `play-status.yml`, or `play-release-name.yml`.
+- **`samsung-rtl`** — Samsung Remote Test Lab, for reproducing device-only failures like the splash hang. Note RTL has **no public API**: device control is browser-only and even its adb bridge needs a human to click through, so it cannot be automated in CI. Figure images were omitted to keep the repo small; each figure's caption and source URL are preserved.
+
 ## Notes
 
 - `pubspec.yaml` declares only packages the code actually imports, using caret constraints (`^1.2.3`); there are no `dependency_overrides`. Platform implementation packages (`*_android`, `*_web`, `*_platform_interface`) are pulled in transitively and must not be listed. `pubspec.lock` **is** committed so CI resolves the same versions.
