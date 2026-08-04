@@ -69,7 +69,9 @@ flutter build ios                    # iOS
 flutter build web                    # web
 ```
 
-Launcher icons are regenerated with `dart run flutter_launcher_icons` (config lives in `pubspec.yaml`), and the splash via `flutter_native_splash.yaml`.
+**Launcher icons are committed, not generated at build time.** `android/app/src/main/res/mipmap-*/ic_launcher.png` (48/72/96/144/192 px) are checked in and are what the manifest's `android:icon="@mipmap/ic_launcher"` resolves to. The master image is `assets/images/app_launcher_icon.png` (512×512) — **if you change it, you must regenerate the five mipmaps and commit them**, or the app keeps shipping the old icon.
+
+This bit us once: the mipmaps sat at Flutter's default icon for the project's whole history because nothing in CI ran a generator, so the first release built in CI (version code 13) shipped the default Flutter logo instead of the app's. `pubspec.yaml` still carries a `flutter_launcher_icons:` block configuring an `android: 'launcher_icon'` output name, but nothing runs it and no `mipmap-*/launcher_icon.png` exists — treat that block as inert unless you deliberately run `dart run flutter_launcher_icons` and commit what it produces (note it also rewrites the manifest's icon reference). The splash is configured in `flutter_native_splash.yaml` and has the same "only regenerates when someone runs it" caveat.
 
 ## Architecture
 
