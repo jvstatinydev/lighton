@@ -1,0 +1,182 @@
+name: Clear Play test track
+
+# 테스트 트랙에 남아 있는 활성 릴리스를 전부 비운다. 오래된 빌드가 트랙에
+# 계속 걸려 있는 것을 정리하는 용도다.
+#
+# 동작 원리: Track 스키마의 releases 는 "In a read request, represents all active
+# releases in the track. In an update request, represents desired changes." 이므로
+# edits.tracks.update 에 releases: [] 를 PUT 하면 그 트랙의 활성 릴리스가 없어진다.
+# (status=halted 로 내리는 방법은 여기서 쓸 수 없다. 가이드가 적어 뒀듯이 halt 는
+#  대신 서빙될 이전 completed 릴리스가 있어야 가능한데, 정리 대상 트랙에는 보통
+#  릴리스가 하나뿐이다.)
+#
+# 되돌리기: 번들 자체는 지워지지 않으므로, 같은 버전 코드로 트랙을 다시 채우면
+# 원상복구된다. build-aab.yml 을 다시 돌릴 필요도 없다.
+#
+# 안전 장치
+#   - production 은 아예 선택지에 없다. 프로덕션 트랙을 비우면 스토어에서 앱이
+#     내려가므로, 이 워크플로로는 건드릴 수 없게 막아 뒀다.
+#   - 기본값은 미리보기(apply=false)다. 무엇이 지워지는지만 출력하고
+#     edits.delete 로 임시 edit 을 지운다. Play Console 에는 아무 영향이 없다.
+#   - apply=true 일 때만 edits.commit 을 호출한다. 이때 confirm 입력에 트랙
+#     이름을 정확히 다시 적어야 진행된다(오조작 방지).
+#   - 트랙에 릴리스가 없으면 아무것도 하지 않고 끝낸다.
+#
+# 필요한 GitHub Secret:
+#   PLAY_SERVICE_ACCOUNT_JSON  build-aab.yml / play-status.yml 과 같은 서비스 계정 키
+
+on:
+  workflow_dispatch:
+    inputs:
+      track:
+        description: "비울 트랙 (production 은 의도적으로 제외돼 있다)"
+        required: true
+        default: beta
+        type: choice
+        options: [beta, alpha, internal]
+      apply:
+        description: "실제로 반영한다. 비워 두면 미리보기만 한다."
+        required: false
+        default: false
+        type: boolean
+      confirm:
+        description: "apply=true 일 때만 필요. 트랙 이름을 그대로 다시 입력. 예: beta"
+        required: false
+        default: ""
+      changes_not_sent_for_review:
+        description: "커밋 시 검토로 보내지 않는다. 보통은 비워 둔다."
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  clear:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Play service account secret
+        env:
+          SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          if [ -z "$SERVICE_ACCOUNT_JSON" ]; then
+            echo "::error::PLAY_SERVICE_ACCOUNT_JSON 시크릿이 필요합니다."
+            exit 1
+          fi
+
+      - name: Install Google auth library
+        run: pip install --quiet google-auth requests
+
+      - name: Clear track releases
+        env:
+          SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          PACKAGE_NAME: com.mycompany.lightonflashlight
+          TRACK: ${{ inputs.track }}
+          APPLY: ${{ inputs.apply }}
+          CONFIRM: ${{ inputs.confirm }}
+          NO_REVIEW: ${{ inputs.changes_not_sent_for_review }}
+        run: |
+          python3 <<'PY'
+          import json, os, sys
+          import google.auth.transport.requests
+          from google.oauth2 import service_account
+
+          PKG = os.environ["PACKAGE_NAME"]
+          BASE = f"https://androidpublisher.googleapis.com/androidpublisher/v3/applications/{PKG}"
+          TRACK = os.environ["TRACK"].strip()
+          APPLY = os.environ["APPLY"].lower() == "true"
+          CONFIRM = os.environ.get("CONFIRM", "").strip()
+          NO_REVIEW = os.environ["NO_REVIEW"].lower() == "true"
+
+          # 선택지에서 이미 빠져 있지만, 손으로 API를 부르거나 워크플로를 고쳤을 때를
+          # 대비해 한 번 더 막는다. 프로덕션을 비우면 스토어에서 앱이 내려간다.
+          if TRACK == "production":
+              print("::error::production 트랙은 이 워크플로로 비울 수 없습니다.")
+              sys.exit(1)
+
+          if APPLY and CONFIRM != TRACK:
+              print(f"::error::apply=true 이면 confirm 에 트랙 이름({TRACK})을 "
+                    f"그대로 입력해야 합니다. 받은 값: {CONFIRM!r}")
+              sys.exit(1)
+
+          creds = service_account.Credentials.from_service_account_info(
+              json.loads(os.environ["SERVICE_ACCOUNT_JSON"]),
+              scopes=["https://www.googleapis.com/auth/androidpublisher"],
+          )
+          session = google.auth.transport.requests.AuthorizedSession(creds)
+
+          def call(method, url, **kw):
+              r = session.request(method, url, **kw)
+              if not r.ok:
+                  print(f"::error::{method} {url.replace(BASE, '')} -> "
+                        f"{r.status_code} {r.text[:400]}")
+                  return None
+              return r.json() if r.text else {}
+
+          edit = call("POST", f"{BASE}/edits")
+          if edit is None:
+              sys.exit(1)
+          edit_id = edit["id"]
+          print(f"임시 edit 생성됨: {edit_id}\n")
+
+          committed = False
+          try:
+              track = call("GET", f"{BASE}/edits/{edit_id}/tracks/{TRACK}")
+              if track is None:
+                  sys.exit(1)
+
+              releases = track.get("releases", [])
+
+              print("=" * 60)
+              print(f"트랙 '{TRACK}' 의 현재 활성 릴리스")
+              print("=" * 60)
+              if not releases:
+                  print("  (없음)")
+              for r in releases:
+                  print(f"  - 이름: {r.get('name')!r}")
+                  print(f"    상태: {r.get('status')}")
+                  print(f"    버전 코드: {r.get('versionCodes')}")
+              print()
+
+              if not releases:
+                  print("이미 비어 있습니다. 변경할 것이 없어 종료합니다.")
+                  sys.exit(0)
+
+              print(f"위 {len(releases)}개 릴리스를 트랙에서 제거합니다.")
+              print("번들 자체는 남아 있으므로, 같은 버전 코드로 트랙을 다시 "
+                    "채우면 되돌릴 수 있습니다.\n")
+
+              if not APPLY:
+                  print("미리보기 모드입니다 (apply=false). 아무것도 반영하지 않았습니다.")
+                  print(f"실제로 반영하려면 apply=true 로, confirm 에 "
+                        f"{TRACK} 를 입력해 다시 실행하세요.")
+                  sys.exit(0)
+
+              updated = call(
+                  "PUT",
+                  f"{BASE}/edits/{edit_id}/tracks/{TRACK}",
+                  json={"track": TRACK, "releases": []},
+              )
+              if updated is None:
+                  sys.exit(1)
+
+              commit_url = f"{BASE}/edits/{edit_id}:commit"
+              if NO_REVIEW:
+                  commit_url += "?changesNotSentForReview=true"
+              result = call("POST", commit_url)
+              if result is None:
+                  sys.exit(1)
+
+              committed = True
+              print("=" * 60)
+              print(f"반영 완료. 트랙 '{TRACK}' 을 비웠습니다.")
+              print("=" * 60)
+              remaining = updated.get("releases", [])
+              print(f"  남은 활성 릴리스: {len(remaining)}개")
+              for r in remaining:
+                  print(f"  - name={r.get('name')!r} "
+                        f"status={r.get('status')} codes={r.get('versionCodes')}")
+          finally:
+              # 커밋했다면 edit은 이미 소비됐다. 그 외에는 반드시 지운다.
+              if not committed:
+                  r = session.request("DELETE", f"{BASE}/edits/{edit_id}")
+                  print(f"\n임시 edit 삭제됨 (HTTP {r.status_code})")
+          PY
