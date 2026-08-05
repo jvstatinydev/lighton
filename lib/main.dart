@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
-import '/flutter_flow/admob_util.dart' show adMobRequestConsent;
+import '/flutter_flow/admob_util.dart' show ensureAdMobReady;
 import '/flutter_flow/flutter_flow_theme.dart';
 import 'flutter_flow/flutter_flow_util.dart';
 import 'flutter_flow/internationalization.dart';
@@ -26,10 +26,11 @@ void main() async {
   final appState = FFAppState(); // Initialize FFAppState
   await appState.initializePersistedState();
 
-  // EEA 사용자를 위한 AdMob 동의(UMP) 흐름. 배너가 광고를 요청하기 전에 최대한
-  // 일찍 시작하되, 네트워크가 없거나 동의를 거부해도 손전등 기능이 막히면 안
-  // 되므로 완료를 기다리지 않는다(실패는 admob_util 안에서 로그로만 남는다).
-  unawaited(adMobRequestConsent());
+  // EEA 사용자를 위한 AdMob 동의(UMP) 흐름 + 광고 SDK 초기화. 최대한 일찍
+  // 시작하되, 네트워크가 없거나 동의를 거부해도 손전등 기능이 막히면 안 되므로
+  // 여기서는 완료를 기다리지 않는다. 배너 쪽이 같은 Future 를 await 하므로
+  // 광고 요청이 초기화를 앞질러 나가는 일은 없다.
+  unawaited(ensureAdMobReady());
 
   runApp(ChangeNotifierProvider(
     create: (context) => appState,
