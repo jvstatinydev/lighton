@@ -15,7 +15,7 @@ import 'admob_util.dart' show adMobReadiness, ensureAdMobReady;
 /// 이 만드는 APK 는 release 빌드라 kDebugMode 로는 구분되지 않으니, 조사용
 /// 빌드에서 이 상수를 true 로 두고 확인한 뒤 Play 출시 전에 false 로 되돌린다.
 /// false 이면 배너 자리는 아무것도 차지하지 않고 접힌다.
-const bool kShowAdBannerDiagnostics = true;
+const bool kShowAdBannerDiagnostics = false;
 
 class FlutterFlowAdBanner extends StatefulWidget {
   const FlutterFlowAdBanner({
