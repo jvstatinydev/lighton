@@ -36,10 +36,13 @@ Google Play requires target API 36 (Android 16) for updates published after 2026
 | `build-aab.yml` | `.aab` | upload key from GitHub Secrets | Play Console upload, and optionally the upload itself |
 | `play-status.yml` | console output | — | read-only Play track/bundle/listing query, no local browser needed |
 | `play-release-name.yml` | console output | — | fix a published release's **name label** only, without uploading anything |
+| `play-track-clear.yml` | console output | — | empty a **test** track's active releases (stale builds left on beta/alpha/internal) |
 
 `build-apk.yml` runs on every push to `main`, `flutterflow`, and `claude/**`. `main` is included because a feature branch is only ever built against the base it branched from — a set of individually-green PRs can still combine into a broken `main`, and without this the merged result would never be built. Its Analyze step uses `--no-fatal-warnings --no-fatal-infos`, so **a green run does not mean the code is warning-free** — read the step's `N issues found` line before claiming analyzer warnings are fixed.
 
-`play-status.yml` and `play-release-name.yml` both authenticate with `PLAY_SERVICE_ACCOUNT_JSON` and open a Play "edit" because the API requires one. `play-status.yml` never commits and always deletes the edit, so it is read-only. `play-release-name.yml` defaults to `apply=false` (preview only, edit deleted) and commits only when `apply=true` *and* `confirm` repeats the target version code.
+`play-status.yml`, `play-release-name.yml`, and `play-track-clear.yml` all authenticate with `PLAY_SERVICE_ACCOUNT_JSON` and open a Play "edit" because the API requires one. `play-status.yml` never commits and always deletes the edit, so it is read-only. The other two default to `apply=false` (preview only, edit deleted) and commit only when `apply=true` *and* `confirm` repeats the target — the version code for `play-release-name.yml`, the track name for `play-track-clear.yml`.
+
+`play-track-clear.yml` empties a track by PUTting `releases: []` — the `Track` schema defines `releases` as "desired changes" on an update, so an empty list drops every active release. `status: halted` is not an option here: halting needs an earlier `completed` release to fall back to, and a stale test track usually holds exactly one. The bundles survive, so re-adding the same version code restores the track. **`production` is deliberately absent from the track choices** (and re-checked in the script) because emptying it would pull the app from the store.
 
 `build-aab.yml` reads `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`; it fails fast if any is missing and deletes the restored keystore with `if: always()`.
 
