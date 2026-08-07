@@ -39,6 +39,15 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      # 에이전트 환경에는 Flutter 툴체인이 없어 pubspec.lock 을 재생성할 수 없다.
+      # 의존성을 바꾼 뒤에는 러너가 해석한 락을 여기서 받아 커밋해야, CI 가 같은
+      # 버전을 쓰도록 락을 커밋하는 의미가 유지된다.
+      - name: Upload resolved pubspec.lock
+        uses: actions/upload-artifact@v4
+        with:
+          name: pubspec-lock
+          path: pubspec.lock
+
       # 코드에 컴파일 오류가 있으면 빌드 전에 빠르게 잡아낸다.
       # 기존 경고(FlutterFlow 생성 코드)는 빌드를 막지 않도록 제외.
       - name: Analyze
