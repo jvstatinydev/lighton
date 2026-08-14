@@ -6,7 +6,7 @@ import 'package:flutter/services.dart';
 /// adb 를 쓸 수 없어 logcat 을 볼 수 없으므로(CLAUDE.md 의 `adb` 항목 참고)
 /// 기기에서 무슨 일이 있었는지 읽으려면 위젯 트리에 그리는 수밖에 없다.
 /// 조사용 빌드에서 true 로 두고 Play 출시 전에 false 로 되돌린다.
-const bool kShowTorchDiagnostics = true;
+const bool kShowTorchDiagnostics = false;
 
 /// 일부러 플래시 없는 카메라를 골라 실패 경로를 재현한다.
 ///
