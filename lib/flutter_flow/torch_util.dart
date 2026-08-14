@@ -18,7 +18,7 @@ const bool kShowTorchDiagnostics = false;
 ///
 /// 조사용이며 출시 빌드에서는 반드시 false 여야 한다. 켜진 채로 나가면
 /// 플래시가 멀쩡한 기기에서도 플래시가 켜지지 않는다.
-const bool kForceNoFlash = true;
+const bool kForceNoFlash = false;
 
 const MethodChannel _channel = MethodChannel('lighton/torch');
 
