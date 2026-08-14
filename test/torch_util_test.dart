@@ -112,12 +112,7 @@ void main() {
     });
   });
 
-  group('출시 전 확인', () {
-    test('진단 상수는 꺼져 있어야 한다', () {
-      // 조사용 빌드에서 켠 뒤 되돌리는 것을 잊으면, 사용자 화면에 카메라
-      // 목록이 그대로 뜨거나 플래시가 아예 안 켜지는 빌드가 나간다.
-      expect(kShowTorchDiagnostics, isFalse);
-      expect(kForceTorchCameraWithoutFlash, isFalse);
-    });
-  });
+  // 진단 상수가 꺼져 있는지는 test/release_guard_test.dart 가 확인한다.
+  // 여기서 확인하면 조사용 APK 를 만들 때(진단을 켠 채 build-apk.yml 을
+  // 돌릴 때) CI 가 빨개져서 APK 가 나오지 않는다.
 }
