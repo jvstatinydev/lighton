@@ -57,9 +57,6 @@ class _FlutterFlowAdBannerState extends State<FlutterFlowAdBanner> {
   BannerAd? _banner;
   AdWidget? _adWidget;
 
-  /// 배너를 로드할 때의 화면 방향. 방향이 바뀌면 크기가 맞지 않는다.
-  Orientation? _loadedOrientation;
-
   /// 화면에 그릴 실패 사유. null 이면 아직 진행 중이라는 뜻이다.
   String? _failure;
 
@@ -77,31 +74,6 @@ class _FlutterFlowAdBannerState extends State<FlutterFlowAdBanner> {
   }
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // 세로에서 계산한 크기를 가로에서 그대로 쓰면 폭이 모자라 좌우가 비고
-    // 높이도 어긋난다. 방향이 바뀌면 그 방향에 맞는 크기로 다시 받는다.
-    final orientation = MediaQuery.orientationOf(context);
-    if (_loadedOrientation != null && _loadedOrientation != orientation) {
-      _reloadForOrientation();
-    }
-  }
-
-  void _reloadForOrientation() {
-    _retryTimer?.cancel();
-    _banner?.dispose();
-    _loadedOrientation = null;
-    setState(() {
-      _banner = null;
-      _adWidget = null;
-      _failure = null;
-      _attempt = 0;
-      _loading = false;
-    });
-    SchedulerBinding.instance.addPostFrameCallback((_) => _load());
-  }
-
-  @override
   void dispose() {
     _retryTimer?.cancel();
     _banner?.dispose();
@@ -114,11 +86,6 @@ class _FlutterFlowAdBannerState extends State<FlutterFlowAdBanner> {
     }
     _loading = true;
     _attempt++;
-
-    // 화면 크기와 방향은 await 전에 읽어둔다. await 뒤에 context 를 다시
-    // 만지면 위젯이 사라진 뒤일 수 있다.
-    final screen = MediaQuery.sizeOf(context);
-    final orientation = MediaQuery.orientationOf(context);
 
     // 광고를 요청하기 전에 동의 수집과 SDK 초기화가 끝나기를 기다린다.
     // 예전에는 기다리지 않고 첫 프레임에 곧장 요청했고, 초기화가 끝나기 전에
@@ -136,26 +103,22 @@ class _FlutterFlowAdBannerState extends State<FlutterFlowAdBanner> {
       return;
     }
 
-    // 예전에는 "Large" 앵커드 어댑티브 크기를 요청했다. 그 자리는 큰 광고를
-    // 담으려고 높게 잡히는데, 실제로 들어오는 광고가 그보다 작으면 큰 상자
-    // 안에서 가운데 정렬되어 위아래가 빈다. 광고 아래에 생기던 여백이 그것이다.
+    // 크기를 화면에 맞춰 계산하지 않고 320x50 으로 고정한다.
     //
-    // 게다가 방향 인자가 항상 portrait 로 고정돼 있었다. 이 화면은 width 를
-    // 넘기지 않으므로 조건이 늘 참이어서, 가로모드에서도 세로 기준으로
-    // 계산됐다. 표준 앵커드 어댑티브 크기를 현재 방향 기준으로 받는다.
-    final AdSize? size = widget.width != null && widget.height != null
+    // 어댑티브 배너는 화면 방향과 크기에 따라 높이가 달라진다. 가로모드에서는
+    // 화면 높이가 얼마 안 되는데 배너가 세로 자리를 가져가서 손전등 버튼이
+    // 위아래로 짜부라졌다. 방향을 바꿀 때마다 배너를 다시 받아야 하는 것도
+    // 그 때문이었다.
+    //
+    // 고정 크기면 세로든 가로든 같은 높이의 막대 하나다. 버튼이 쓸 수 있는
+    // 자리가 방향에 따라 흔들리지 않고, 회전해도 다시 받을 필요가 없다.
+    // 320x50 은 가장 오래된 규격이라 채워지는 광고도 가장 많다.
+    final AdSize size = widget.width != null && widget.height != null
         ? AdSize(
             height: widget.height!.toInt(),
             width: widget.width!.toInt(),
           )
-        : await AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(
-            screen.width.truncate(),
-          );
-
-    if (size == null) {
-      _fail('배너 크기를 계산하지 못했습니다.');
-      return;
-    }
+        : AdSize.banner;
 
     final isAndroid = !kIsWeb && Platform.isAndroid;
     final banner = BannerAd(
@@ -177,7 +140,6 @@ class _FlutterFlowAdBannerState extends State<FlutterFlowAdBanner> {
           setState(() {
             _banner = ad as BannerAd;
             _adWidget = AdWidget(ad: ad);
-            _loadedOrientation = orientation;
             _failure = null;
             _loading = false;
           });
