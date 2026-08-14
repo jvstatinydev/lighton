@@ -1,0 +1,251 @@
+name: Read Play Store reviews
+
+# Play Console을 열지 않고 사용자 리뷰를 읽는다. 완전한 읽기 전용이다.
+#
+# play-status.yml과 달리 edit을 아예 만들지 않는다. reviews API는 edit이
+# 필요 없는 계열이라, 이 워크플로는 Play의 어떤 상태도 건드릴 수 없다.
+#
+# 필요한 GitHub Secret:
+#   PLAY_SERVICE_ACCOUNT_JSON  build-aab.yml이 쓰는 것과 같은 서비스 계정 키
+#
+# 서비스 계정에 Play Console에서 "리뷰에 답글 달기(Reply to reviews)" 권한이
+# 켜져 있어야 한다. 없으면 401/403으로 떨어진다.
+#
+# ── API의 제약 (구글 문서에 명시된 것으로, 우회 방법이 없다) ──
+#
+#   1. 본문 없이 별점만 남긴 리뷰는 응답에 아예 포함되지 않는다.
+#      "the API shows only the reviews that include comments"
+#   2. 최근 7일 이내에 작성/수정된 리뷰만 조회된다. 그 이상 과거를 보려면
+#      Play Console에서 CSV를 내려받는 수밖에 없다.
+#   3. 프로덕션 트랙의 리뷰만 나온다. 알파/베타 피드백은 안 나온다.
+#
+# 그래서 "전체 리뷰 감사"에는 쓸 수 없고, 최근 일주일치를 놓치지 않고 읽는
+# 용도다. 7일이 지나면 사라지므로 낮은 평점이 보이면 그 주에 돌려야 한다.
+#
+# ── 로그에 무엇이 남는지 ──
+#
+# 이 레포는 공개이므로 Actions 로그도 공개다. 리뷰 본문과 기기 정보는 이미
+# 스토어에 공개된 정보라 그대로 찍지만, 작성자 이름은 진단에 쓸모가 없으므로
+# 기본적으로 가린다(show_author_name 으로 켤 수 있다).
+
+on:
+  workflow_dispatch:
+    inputs:
+      translation_language:
+        description: "리뷰를 번역할 언어 (예: ko, en). 원문도 함께 표시된다"
+        required: false
+        default: "ko"
+      only_low_ratings:
+        description: "1~2점 리뷰만 본다"
+        type: boolean
+        required: false
+        default: false
+      version_code:
+        description: "이 버전 코드에서 작성된 리뷰만 본다 (비우면 전체). 예: 15"
+        required: false
+        default: ""
+      show_author_name:
+        description: "작성자 이름을 로그에 표시한다 (공개 로그에 남는다)"
+        type: boolean
+        required: false
+        default: false
+
+jobs:
+  reviews:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Play service account secret
+        env:
+          SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          if [ -z "$SERVICE_ACCOUNT_JSON" ]; then
+            echo "::error::PLAY_SERVICE_ACCOUNT_JSON 시크릿이 필요합니다."
+            exit 1
+          fi
+
+      - name: Install Google auth library
+        run: pip install --quiet google-auth requests
+
+      - name: Fetch reviews
+        env:
+          SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          TRANSLATION_LANGUAGE: ${{ inputs.translation_language }}
+          ONLY_LOW_RATINGS: ${{ inputs.only_low_ratings }}
+          VERSION_CODE: ${{ inputs.version_code }}
+          SHOW_AUTHOR_NAME: ${{ inputs.show_author_name }}
+          PACKAGE_NAME: com.mycompany.lightonflashlight
+        run: |
+          python3 <<'PY'
+          import json, os, sys
+          from collections import Counter
+          from datetime import datetime, timezone
+
+          import google.auth.transport.requests
+          from google.oauth2 import service_account
+
+          PKG = os.environ["PACKAGE_NAME"]
+          BASE = f"https://androidpublisher.googleapis.com/androidpublisher/v3/applications/{PKG}"
+
+          lang = os.environ.get("TRANSLATION_LANGUAGE", "").strip()
+          only_low = os.environ.get("ONLY_LOW_RATINGS") == "true"
+          show_author = os.environ.get("SHOW_AUTHOR_NAME") == "true"
+          raw_code = os.environ.get("VERSION_CODE", "").strip()
+          want_code = int(raw_code) if raw_code else None
+
+          creds = service_account.Credentials.from_service_account_info(
+              json.loads(os.environ["SERVICE_ACCOUNT_JSON"]),
+              scopes=["https://www.googleapis.com/auth/androidpublisher"],
+          )
+          session = google.auth.transport.requests.AuthorizedSession(creds)
+
+          # ── 리뷰 수집. edit을 만들지 않으므로 정리할 것도 없다. ──
+          reviews = []
+          params = {"maxResults": 100}
+          if lang:
+              params["translationLanguage"] = lang
+
+          token = None
+          page = 0
+          while True:
+              page += 1
+              q = dict(params)
+              if token:
+                  q["token"] = token
+              r = session.get(f"{BASE}/reviews", params=q)
+              if not r.ok:
+                  print(f"::error::GET /reviews -> {r.status_code} {r.text[:400]}")
+                  if r.status_code in (401, 403):
+                      print("::error::서비스 계정에 Play Console의 "
+                            "'리뷰에 답글 달기(Reply to reviews)' 권한이 있는지 확인하세요.")
+                  sys.exit(1)
+              body = r.json() if r.text else {}
+              batch = body.get("reviews", [])
+              reviews.extend(batch)
+              token = body.get("tokenPagination", {}).get("nextPageToken")
+              print(f"{page}페이지: {len(batch)}건 (누적 {len(reviews)}건)")
+              if not token:
+                  break
+
+          # 사용자 코멘트가 실제로 달린 것만 센다. 개발자 답글만 있는 항목이
+          # 섞여 들어오는 경우가 있어 len(reviews) 를 그대로 쓰면 어긋난다.
+          usable = [r for r in reviews
+                    if any("userComment" in c for c in r.get("comments", []))]
+
+          print()
+          print("=" * 68)
+          print(f"최근 7일 리뷰 {len(usable)}건 (본문이 있는 프로덕션 리뷰만)")
+          print("=" * 68)
+
+          if not usable:
+              print()
+              print("조회된 리뷰가 없습니다. 다음 중 하나일 수 있습니다:")
+              print("  - 최근 7일 안에 본문 있는 리뷰가 없었다")
+              print("  - 남은 평점이 전부 본문 없는 별점이었다 (API로는 볼 수 없음)")
+              sys.exit(0)
+
+          def flatten(review):
+              """리뷰에서 사용자 코멘트와 개발자 답글을 뽑아낸다."""
+              user, dev = None, None
+              for c in review.get("comments", []):
+                  if "userComment" in c:
+                      user = c["userComment"]
+                  elif "developerComment" in c:
+                      dev = c["developerComment"]
+              return user, dev
+
+          def when(ts):
+              if not ts:
+                  return "?"
+              secs = int(ts.get("seconds", 0))
+              return datetime.fromtimestamp(secs, timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+
+          stars = Counter()
+          sdks = Counter()
+          codes = Counter()
+          shown = 0
+
+          for review in usable:
+              user, dev = flatten(review)
+              if user is None:
+                  continue
+
+              rating = user.get("starRating")
+              sdk = user.get("androidOsVersion")
+              code = user.get("appVersionCode")
+
+              # 요약 통계는 필터와 무관하게 전체를 대상으로 센다.
+              stars[rating] += 1
+              sdks[sdk] += 1
+              codes[code] += 1
+
+              if only_low and (rating is None or rating > 2):
+                  continue
+              if want_code is not None and code != want_code:
+                  continue
+
+              shown += 1
+              meta = user.get("deviceMetadata", {}) or {}
+
+              # 스키마상 device / appVersionCode / deviceMetadata 등은 "May be
+              # absent" 라, 없는 값을 그대로 찍으면 None 이 노출된다. 있는 항목만
+              # 모아서 한 줄로 잇는다.
+              device_bits = [x for x in (meta.get("manufacturer"),
+                                         meta.get("productName") or user.get("device")) if x]
+              hw = ["기기: " + (" ".join(device_bits) if device_bits else "(정보 없음)")]
+              if meta.get("screenWidthPx") and meta.get("screenHeightPx"):
+                  hw.append(f"화면 {meta['screenWidthPx']}x{meta['screenHeightPx']}")
+              if meta.get("ramMb"):
+                  hw.append(f"RAM {meta['ramMb']}MB")
+
+              ver = user.get("appVersionName") or "?"
+              if code is not None:
+                  ver += f" ({code})"
+
+              print()
+              print("-" * 68)
+              print(f"{'★' * (rating or 0)}{'☆' * (5 - (rating or 0))}  ({rating}점)   {when(user.get('lastModified'))}")
+              if show_author:
+                  print(f"작성자: {review.get('authorName') or '(이름 없음)'}")
+              print(f"리뷰 ID: {review.get('reviewId')}")
+              print("  |  ".join(hw))
+              print(f"Android SDK: {sdk if sdk is not None else '?'}  |  앱 버전: {ver}")
+              print(f"작성 언어: {user.get('reviewerLanguage') or '?'}")
+              print()
+
+              original = user.get("originalText")
+              text = user.get("text") or "(본문 없음)"
+              if original:
+                  # 번역이 일어난 경우. 원문이 진짜 사용자가 쓴 문장이다.
+                  print(f"  [원문] {original}")
+                  print()
+                  print(f"  [{lang} 번역] {text}")
+              else:
+                  print(f"  {text}")
+
+              if dev:
+                  print()
+                  print(f"  [개발자 답글 {when(dev.get('lastModified'))}] {dev.get('text')}")
+
+          print()
+          print("=" * 68)
+          print("요약 (필터와 무관하게 조회된 전체 기준)")
+          print("=" * 68)
+
+          def dist(title, counter):
+              print(f"\n{title}")
+              for key, n in sorted(counter.items(), key=lambda kv: (kv[0] is None, kv[0])):
+                  print(f"  {key if key is not None else '(정보 없음)'}: {n}건")
+
+          dist("별점 분포", stars)
+          dist("Android SDK 분포", sdks)
+          dist("앱 버전 코드 분포", codes)
+
+          low = sum(n for s, n in stars.items() if s is not None and s <= 2)
+          print(f"\n1~2점: {len(usable)}건 중 {low}건")
+          if only_low or want_code is not None:
+              print(f"필터를 통과해 위에 출력된 리뷰: {shown}건")
+
+          print()
+          print("참고: 본문 없이 별점만 남긴 리뷰는 이 목록에 포함되지 않습니다.")
+          print("      7일보다 오래된 리뷰도 API로는 조회할 수 없습니다.")
+          PY
