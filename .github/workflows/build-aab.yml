@@ -127,6 +127,12 @@ jobs:
       - name: Analyze
         run: flutter analyze --no-fatal-warnings --no-fatal-infos
 
+      # 이 워크플로만 Play 로 올라가므로, 진단 상수가 켜진 채 나가는 것을
+      # 여기서 막는다. 사이드로드용 build-apk.yml 은 조사용 빌드를 만드는
+      # 통로이므로 같은 검사를 걸지 않는다.
+      - name: Test
+        run: flutter test test/torch_util_test.dart test/release_guard_test.dart
+
       - name: Build release AAB
         env:
           BUILD_NAME: ${{ inputs.build_name }}

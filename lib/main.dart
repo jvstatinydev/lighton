@@ -10,11 +10,10 @@ import '/flutter_flow/flutter_flow_theme.dart';
 import 'flutter_flow/flutter_flow_util.dart';
 import 'flutter_flow/internationalization.dart';
 
-
-import 'package:torch_controller/torch_controller.dart';
-
 void main() async {
-  TorchController().initialize();
+  // 예전에는 여기서 TorchController().initialize() 를 호출했는데,
+  // WidgetsFlutterBinding.ensureInitialized() 보다도 앞이었다. 지금은 플래시
+  // 초기화가 따로 없다 — 첫 사용 시점에 카메라를 조회한다.
   WidgetsFlutterBinding.ensureInitialized();
   GoRouter.optionURLReflectsImperativeAPIs = true;
   usePathUrlStrategy();

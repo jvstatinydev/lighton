@@ -7,12 +7,11 @@ import 'package:flutter/material.dart';
 // Begin custom action code
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
 
-// Set your action name, define your arguments and return parameter,
-// and then add the boilerplate code using the green button on the right!
-import 'package:torch_controller/torch_controller.dart';
+// 실제 구현은 torch_util 에 있다. 이 디렉터리는 analysis_options.yaml 에서
+// 분석 제외라 여기 있는 코드는 flutter analyze 가 봐주지 않는다. 그래서
+// 판단이 필요한 부분은 전부 torch_util 로 옮기고 여기는 호출만 남긴다.
+import '/flutter_flow/torch_util.dart' as torch;
 
-TorchController controller = TorchController();
-
-Future<bool?> toggleFlashlight() async {
-  return controller.toggle();
+Future<bool> toggleFlashlight() async {
+  return torch.toggleTorch();
 }
