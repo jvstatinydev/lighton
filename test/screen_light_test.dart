@@ -42,15 +42,9 @@ void main() {
     // 쓰는 분들이 이 경로로 들어오므로, 한 언어라도 비면 안 된다.
     const key = 'n4v8t2q6';
 
-    Map<String, String>? notice() {
-      for (final section in kTranslationsMap) {
-        final entry = section[key];
-        if (entry != null) {
-          return entry;
-        }
-      }
-      return null;
-    }
+    // kTranslationsMap 은 선언 끝에서 .reduce((a, b) => a..addAll(b)) 로
+    // 평탄화되므로, 페이지별 구획이 아니라 키 하나로 바로 찾는다.
+    Map<String, String>? notice() => kTranslationsMap[key];
 
     test('문구 키가 번역 지도에 있다', () {
       expect(notice(), isNotNull);

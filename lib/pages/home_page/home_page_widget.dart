@@ -431,10 +431,14 @@ class _HomePageWidgetState extends State<HomePageWidget>
                       ),
                     ),
                   ),
-                FlutterFlowAdBanner(
-                  showsTestAd: false,
-                  androidAdUnitID: 'ca-app-pub-3228085068090706/4930787659',
-                ),
+                // 화면을 조명으로 쓰는 동안에만 배너를 숨긴다. 그때는 배너가
+                // 빛을 깎아먹기만 하고, 화면을 등지고 비추는 상황이라 광고를
+                // 볼 사람도 없다. 조명을 끄면 다시 보인다.
+                if (!screenLit)
+                  FlutterFlowAdBanner(
+                    showsTestAd: false,
+                    androidAdUnitID: 'ca-app-pub-3228085068090706/4930787659',
+                  ),
               ],
             ),
           ),
