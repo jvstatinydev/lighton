@@ -36,40 +36,53 @@ void main() {
     });
   });
 
-  group('안내 문구 번역', () {
-    // 이 앱은 77개 언어를 지원한다. 안내 문구가 번역되지 않은 언어의 사용자는
-    // 왜 화면이 하얘졌는지 알 수 없다. 눈이 좋지 않거나 사양이 낮은 기기를
-    // 쓰는 분들이 이 경로로 들어오므로, 한 언어라도 비면 안 된다.
-    const key = 'n4v8t2q6';
+  // 이 앱은 77개 언어를 지원한다. 안내가 번역되지 않은 언어의 사용자는 왜
+  // 화면이 하얘졌는지 알 수 없다. 눈이 좋지 않거나 사양이 낮은 기기를 쓰는
+  // 분들이 이 경로로 들어오므로, 한 언어라도 비면 안 된다.
+  //
+  // kTranslationsMap 은 선언 끝에서 .reduce((a, b) => a..addAll(b)) 로
+  // 평탄화되므로, 페이지별 구획이 아니라 키 하나로 바로 찾는다.
+  //
+  // 안내 창은 본문과 확인 버튼 두 개의 문구로 이루어진다. 버튼이 번역되지
+  // 않으면 창을 닫는 방법을 알 수 없으므로 본문과 똑같이 취급한다.
+  const keys = {
+    'n4v8t2q6': '안내 본문',
+    'q7w3e5r1': '확인 버튼',
+  };
 
-    // kTranslationsMap 은 선언 끝에서 .reduce((a, b) => a..addAll(b)) 로
-    // 평탄화되므로, 페이지별 구획이 아니라 키 하나로 바로 찾는다.
-    Map<String, String>? notice() => kTranslationsMap[key];
+  keys.forEach((key, label) {
+    group('$label 번역 ($key)', () {
+      Map<String, String>? entry() => kTranslationsMap[key];
 
-    test('문구 키가 번역 지도에 있다', () {
-      expect(notice(), isNotNull);
+      test('키가 번역 지도에 있다', () {
+        expect(entry(), isNotNull);
+      });
+
+      test('지원하는 모든 언어에 번역이 있다', () {
+        final translations = entry()!;
+        final missing = FFLocalizations.languages()
+            .where((lang) => !translations.containsKey(lang))
+            .toList();
+        expect(missing, isEmpty, reason: '번역이 빠진 언어: $missing');
+      });
+
+      test('빈 번역이 없다', () {
+        final translations = entry()!;
+        final blank = translations.entries
+            .where((e) => e.value.trim().isEmpty)
+            .map((e) => e.key)
+            .toList();
+        expect(blank, isEmpty, reason: '번역이 비어 있는 언어: $blank');
+      });
     });
+  });
 
-    test('지원하는 모든 언어에 번역이 있다', () {
-      final translations = notice()!;
-      final missing = FFLocalizations.languages()
-          .where((lang) => !translations.containsKey(lang))
-          .toList();
-      expect(missing, isEmpty, reason: '번역이 빠진 언어: $missing');
-    });
-
-    test('빈 번역이 없다', () {
-      final translations = notice()!;
-      final blank = translations.entries
-          .where((e) => e.value.trim().isEmpty)
-          .map((e) => e.key)
-          .toList();
-      expect(blank, isEmpty, reason: '번역이 비어 있는 언어: $blank');
-    });
-
-    test('번역이 원문 그대로 복사되어 있지 않다', () {
+  group('안내 본문은 한국어 복사가 아니어야 한다', () {
+    test('원문 그대로 들어간 언어가 없다', () {
       // 번역을 채운다고 한국어를 그대로 붙여 넣으면 안 채운 것과 같다.
-      final translations = notice()!;
+      // 확인 버튼은 'OK' 처럼 여러 언어가 같은 표기를 쓰는 것이 정상이라
+      // 이 검사를 본문에만 적용한다.
+      final translations = kTranslationsMap['n4v8t2q6']!;
       final korean = translations['ko']!;
       final copied = translations.entries
           .where((e) => e.key != 'ko' && e.value == korean)

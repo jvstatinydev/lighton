@@ -4,6 +4,8 @@ import '/flutter_flow/flutter_flow_language_selector.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
+import '/flutter_flow/screen_light_notice.dart'
+    show showScreenLightNoticeOnce;
 import '/flutter_flow/screen_light_util.dart' show setKeepAwake;
 import '/flutter_flow/torch_util.dart'
     show kShowTorchDiagnostics, torchStatus, usesScreenLight;
@@ -50,6 +52,12 @@ class _HomePageWidgetState extends State<HomePageWidget>
       _model.isFlashOnInit = await actions.getFlashlightStatus();
       FFAppState().isFlashOn = _model.isFlashOnInit!;
       FFAppState().update(() {});
+
+      // 플래시가 없어 화면을 조명으로 쓰는 기기라면, 왜 화면이 하얘지는지
+      // 처음 한 번 설명한다. 위 호출로 카메라 조회가 끝나야 알 수 있다.
+      if (usesScreenLight && mounted) {
+        await showScreenLightNoticeOnce(context);
+      }
       await Future.delayed(const Duration(milliseconds: 100));
       if (FFAppState().isFlashOn) {
         // button on animation
@@ -158,14 +166,6 @@ class _HomePageWidgetState extends State<HomePageWidget>
     // 빛을 내는 것이 목적이므로 색이 있는 영역은 그만큼 빛을 깎아먹는다.
     final screenLit = usesScreenLight && FFAppState().isFlashOn;
 
-    // 가로모드에서는 세로로 쓸 수 있는 자리가 얼마 안 된다. 안내 문구와 버튼을
-    // 위아래로 쌓으면 버튼이 짜부라지므로, 좌우로 나란히 놓아 버튼이 높이
-    // 대신 너비를 쓰게 한다.
-    final size = MediaQuery.sizeOf(context);
-    final isLandscape = size.width > size.height;
-    final buttonWidth = isLandscape ? size.width * 0.45 : size.width * 0.8;
-    final buttonHeight = isLandscape ? size.height * 0.72 : size.height * 0.5;
-
     return Opacity(
       // 화면을 조명으로 쓰는 동안에는 빛을 깎지 않는다.
       opacity: screenLit ? 1.0 : 0.9,
@@ -257,181 +257,139 @@ class _HomePageWidgetState extends State<HomePageWidget>
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Expanded(
-                  child: Flex(
-                    // 세로모드면 문구 위 / 버튼 아래, 가로모드면 좌우로 나란히.
-                    direction: isLandscape ? Axis.horizontal : Axis.vertical,
+                  flex: 6,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.max,
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      if (usesScreenLight)
-                        Flexible(
-                          // 시스템 글꼴을 크게 키운 사용자에게도 문구가 잘리면
-                          // 안 된다. 글자를 줄이는 대신(FittedBox 같은 것)
-                          // 필요하면 스크롤되게 둔다. 읽는 것이 우선이다.
-                          flex: isLandscape ? 4 : 1,
-                          child: SingleChildScrollView(
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16.0,
-                                vertical: 12.0,
+                      if (!valueOrDefault<bool>(
+                        FFAppState().isFlashOn,
+                        true,
+                      ))
+                        Expanded(
+                          child: Align(
+                            alignment: AlignmentDirectional(0.0, 0.0),
+                            child: FFButtonWidget(
+                              onPressed: () async {
+                                await action_blocks
+                                    .toggleFlashlightThenUpdateState(context);
+                                if (animationsMap[
+                                        'buttonOnActionTriggerAnimation2'] !=
+                                    null) {
+                                  await animationsMap[
+                                          'buttonOnActionTriggerAnimation2']!
+                                      .controller
+                                      .forward(from: 0.0);
+                                }
+                              },
+                              text: FFLocalizations.of(context).getText(
+                                'c0ob4q61' /* 꺼짐 */,
                               ),
-                              child: Text(
-                                FFLocalizations.of(context).getText(
-                                  'n4v8t2q6' /* 이 기기는 플래시가 없어 화면을 밝힙니다 */,
-                                ),
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  // 눈이 좋지 않은 분들이 읽을 수 있어야 한다.
-                                  // 시스템 글꼴 배율은 Flutter 가 여기에 곱해 주므로
-                                  // 따로 막지 않는다.
-                                  fontSize: 20.0,
-                                  fontWeight: FontWeight.w600,
-                                  height: 1.4,
-                                  // 조명이 켜지면 배경이 흰색이 되므로 대비를 위해
-                                  // 검정으로 바꾼다.
-                                  color: screenLit
-                                      ? Colors.black
-                                      : FlutterFlowTheme.of(context).primaryText,
-                                ),
+                              options: FFButtonOptions(
+                                width: MediaQuery.sizeOf(context).width * 0.8,
+                                height: MediaQuery.sizeOf(context).height * 0.5,
+                                padding: EdgeInsetsDirectional.fromSTEB(
+                                    16.0, 0.0, 16.0, 0.0),
+                                iconPadding: EdgeInsetsDirectional.fromSTEB(
+                                    0.0, 0.0, 0.0, 0.0),
+                                color: FlutterFlowTheme.of(context).alternate,
+                                textStyle: FlutterFlowTheme.of(context)
+                                    .titleSmall
+                                    .override(
+                                      font: GoogleFonts.interTight(
+                                        fontWeight: FlutterFlowTheme.of(context)
+                                            .titleSmall
+                                            .fontWeight,
+                                        fontStyle: FlutterFlowTheme.of(context)
+                                            .titleSmall
+                                            .fontStyle,
+                                      ),
+                                      color: FlutterFlowTheme.of(context)
+                                          .primaryText,
+                                      fontSize: 60.0,
+                                      letterSpacing: 0.0,
+                                      fontWeight: FlutterFlowTheme.of(context)
+                                          .titleSmall
+                                          .fontWeight,
+                                      fontStyle: FlutterFlowTheme.of(context)
+                                          .titleSmall
+                                          .fontStyle,
+                                    ),
+                                elevation: 0.0,
+                                borderRadius: BorderRadius.circular(8.0),
                               ),
+                            ).animateOnActionTrigger(
+                              animationsMap['buttonOnActionTriggerAnimation1']!,
                             ),
                           ),
                         ),
-                      Expanded(
-                        flex: 6,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.max,
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            if (!valueOrDefault<bool>(
-                              FFAppState().isFlashOn,
-                              true,
-                            ))
-                              Expanded(
-                                child: Align(
-                                  alignment: AlignmentDirectional(0.0, 0.0),
-                                  child: FFButtonWidget(
-                                    onPressed: () async {
-                                      await action_blocks
-                                          .toggleFlashlightThenUpdateState(context);
-                                      if (animationsMap[
-                                              'buttonOnActionTriggerAnimation2'] !=
-                                          null) {
-                                        await animationsMap[
-                                                'buttonOnActionTriggerAnimation2']!
-                                            .controller
-                                            .forward(from: 0.0);
-                                      }
-                                    },
-                                    text: FFLocalizations.of(context).getText(
-                                      'c0ob4q61' /* 꺼짐 */,
-                                    ),
-                                    options: FFButtonOptions(
-                                      width: buttonWidth,
-                                      height: buttonHeight,
-                                      padding: EdgeInsetsDirectional.fromSTEB(
-                                          16.0, 0.0, 16.0, 0.0),
-                                      iconPadding: EdgeInsetsDirectional.fromSTEB(
-                                          0.0, 0.0, 0.0, 0.0),
-                                      color: FlutterFlowTheme.of(context).alternate,
-                                      textStyle: FlutterFlowTheme.of(context)
-                                          .titleSmall
-                                          .override(
-                                            font: GoogleFonts.interTight(
-                                              fontWeight: FlutterFlowTheme.of(context)
-                                                  .titleSmall
-                                                  .fontWeight,
-                                              fontStyle: FlutterFlowTheme.of(context)
-                                                  .titleSmall
-                                                  .fontStyle,
-                                            ),
-                                            color: FlutterFlowTheme.of(context)
-                                                .primaryText,
-                                            fontSize: 60.0,
-                                            letterSpacing: 0.0,
-                                            fontWeight: FlutterFlowTheme.of(context)
-                                                .titleSmall
-                                                .fontWeight,
-                                            fontStyle: FlutterFlowTheme.of(context)
-                                                .titleSmall
-                                                .fontStyle,
-                                          ),
-                                      elevation: 0.0,
-                                      borderRadius: BorderRadius.circular(8.0),
-                                    ),
-                                  ).animateOnActionTrigger(
-                                    animationsMap['buttonOnActionTriggerAnimation1']!,
-                                  ),
-                                ),
+                      if (valueOrDefault<bool>(
+                        FFAppState().isFlashOn,
+                        true,
+                      ))
+                        Expanded(
+                          child: Align(
+                            alignment: AlignmentDirectional(0.0, 0.0),
+                            child: FFButtonWidget(
+                              onPressed: () async {
+                                await action_blocks
+                                    .toggleFlashlightThenUpdateState(context);
+                                if (animationsMap[
+                                        'buttonOnActionTriggerAnimation1'] !=
+                                    null) {
+                                  await animationsMap[
+                                          'buttonOnActionTriggerAnimation1']!
+                                      .controller
+                                      .forward(from: 0.0);
+                                }
+                              },
+                              text: FFLocalizations.of(context).getText(
+                                '24qab3qx' /* 켜짐 */,
                               ),
-                            if (valueOrDefault<bool>(
-                              FFAppState().isFlashOn,
-                              true,
-                            ))
-                              Expanded(
-                                child: Align(
-                                  alignment: AlignmentDirectional(0.0, 0.0),
-                                  child: FFButtonWidget(
-                                    onPressed: () async {
-                                      await action_blocks
-                                          .toggleFlashlightThenUpdateState(context);
-                                      if (animationsMap[
-                                              'buttonOnActionTriggerAnimation1'] !=
-                                          null) {
-                                        await animationsMap[
-                                                'buttonOnActionTriggerAnimation1']!
-                                            .controller
-                                            .forward(from: 0.0);
-                                      }
-                                    },
-                                    text: FFLocalizations.of(context).getText(
-                                      '24qab3qx' /* 켜짐 */,
-                                    ),
-                                    options: FFButtonOptions(
-                                      width: buttonWidth,
-                                      height: buttonHeight,
-                                      padding: EdgeInsetsDirectional.fromSTEB(
-                                          16.0, 0.0, 16.0, 0.0),
-                                      iconAlignment: IconAlignment.start,
-                                      iconPadding: EdgeInsetsDirectional.fromSTEB(
-                                          0.0, 0.0, 0.0, 0.0),
+                              options: FFButtonOptions(
+                                width: MediaQuery.sizeOf(context).width * 0.8,
+                                height: MediaQuery.sizeOf(context).height * 0.5,
+                                padding: EdgeInsetsDirectional.fromSTEB(
+                                    16.0, 0.0, 16.0, 0.0),
+                                iconAlignment: IconAlignment.start,
+                                iconPadding: EdgeInsetsDirectional.fromSTEB(
+                                    0.0, 0.0, 0.0, 0.0),
+                                color: screenLit
+                                    ? Colors.white
+                                    : Color(0xFF38B6A8),
+                                textStyle: FlutterFlowTheme.of(context)
+                                    .titleSmall
+                                    .override(
+                                      font: GoogleFonts.interTight(
+                                        fontWeight: FlutterFlowTheme.of(context)
+                                            .titleSmall
+                                            .fontWeight,
+                                        fontStyle: FlutterFlowTheme.of(context)
+                                            .titleSmall
+                                            .fontStyle,
+                                      ),
                                       color: screenLit
-                                          ? Colors.white
-                                          : Color(0xFF38B6A8),
-                                      textStyle: FlutterFlowTheme.of(context)
+                                          ? Colors.black
+                                          : Colors.white,
+                                      fontSize: 60.0,
+                                      letterSpacing: 0.0,
+                                      fontWeight: FlutterFlowTheme.of(context)
                                           .titleSmall
-                                          .override(
-                                            font: GoogleFonts.interTight(
-                                              fontWeight: FlutterFlowTheme.of(context)
-                                                  .titleSmall
-                                                  .fontWeight,
-                                              fontStyle: FlutterFlowTheme.of(context)
-                                                  .titleSmall
-                                                  .fontStyle,
-                                            ),
-                                            color: screenLit
-                                                ? Colors.black
-                                                : Colors.white,
-                                            fontSize: 60.0,
-                                            letterSpacing: 0.0,
-                                            fontWeight: FlutterFlowTheme.of(context)
-                                                .titleSmall
-                                                .fontWeight,
-                                            fontStyle: FlutterFlowTheme.of(context)
-                                                .titleSmall
-                                                .fontStyle,
-                                          ),
-                                      elevation: 0.0,
-                                      borderRadius: BorderRadius.circular(8.0),
+                                          .fontWeight,
+                                      fontStyle: FlutterFlowTheme.of(context)
+                                          .titleSmall
+                                          .fontStyle,
                                     ),
-                                  ).animateOnActionTrigger(
-                                    animationsMap['buttonOnActionTriggerAnimation2']!,
-                                  ),
-                                ),
+                                elevation: 0.0,
+                                borderRadius: BorderRadius.circular(8.0),
+                              ),
+                            ).animateOnActionTrigger(
+                              animationsMap['buttonOnActionTriggerAnimation2']!,
                             ),
-                          ],
-                        ).animateOnPageLoad(animationsMap['rowOnPageLoadAnimation']!),
-                      ),
+                          ),
+                        ),
                     ],
-                  ),
+                  ).animateOnPageLoad(animationsMap['rowOnPageLoadAnimation']!),
                 ),
                 if (kShowTorchDiagnostics)
                   Container(
