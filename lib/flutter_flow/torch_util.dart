@@ -14,7 +14,7 @@ const bool kShowTorchDiagnostics = false;
 ///
 /// "플래시가 없는 기기" 를 따로 구하지 않아도, 손에 있는 기기의 전면 카메라로
 /// 같은 상황을 만들 수 있다. 조사용이며 출시 빌드에서는 반드시 false 여야 한다.
-const bool kForceTorchCameraWithoutFlash = false;
+const bool kForceTorchCameraWithoutFlash = true;
 
 const MethodChannel _channel = MethodChannel('lighton/torch');
 
