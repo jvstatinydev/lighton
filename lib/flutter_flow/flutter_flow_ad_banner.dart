@@ -25,6 +25,7 @@ class FlutterFlowAdBanner extends StatefulWidget {
     required this.showsTestAd,
     this.iOSAdUnitID,
     this.androidAdUnitID,
+    this.hideAd = false,
   }) : super(key: key);
 
   final double? width;
@@ -32,6 +33,16 @@ class FlutterFlowAdBanner extends StatefulWidget {
   final bool showsTestAd;
   final String? iOSAdUnitID;
   final String? androidAdUnitID;
+
+  /// 광고를 감추되 차지하던 자리는 그대로 둔다.
+  ///
+  /// 화면 조명을 켜면 배너를 감추는데, 위젯을 통째로 빼면 그만큼 레이아웃이
+  /// 줄어들면서 화면 전체가 출렁인다. 자리를 유지하고 흰색으로 덮으면
+  /// 껐다 켤 때 아무것도 움직이지 않는다.
+  ///
+  /// AdWidget 자체를 그리지 않으므로, 보이지 않는 광고가 노출로 잡히지도
+  /// 않는다. 로드된 배너는 그대로 두어 다시 켤 때 즉시 나타난다.
+  final bool hideAd;
 
   @override
   _FlutterFlowAdBannerState createState() => _FlutterFlowAdBannerState();
@@ -182,7 +193,10 @@ class _FlutterFlowAdBannerState extends State<FlutterFlowAdBanner> {
         alignment: Alignment.center,
         width: banner.size.width.toDouble(),
         height: banner.size.height.toDouble(),
-        child: adWidget,
+        // 감출 때는 같은 크기의 흰 자리로 남긴다. 크기가 그대로라 레이아웃이
+        // 움직이지 않고, 조명 중에는 배경과 같은 흰색이라 눈에 띄지도 않는다.
+        color: widget.hideAd ? Colors.white : null,
+        child: widget.hideAd ? null : adWidget,
       );
     }
 

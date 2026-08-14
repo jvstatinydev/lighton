@@ -430,14 +430,17 @@ class _HomePageWidgetState extends State<HomePageWidget>
                       ),
                     ),
                   ),
-                // 화면을 조명으로 쓰는 동안에만 배너를 숨긴다. 그때는 배너가
+                // 화면을 조명으로 쓰는 동안에만 배너를 감춘다. 그때는 배너가
                 // 빛을 깎아먹기만 하고, 화면을 등지고 비추는 상황이라 광고를
                 // 볼 사람도 없다. 조명을 끄면 다시 보인다.
-                if (!screenLit)
-                  FlutterFlowAdBanner(
-                    showsTestAd: false,
-                    androidAdUnitID: 'ca-app-pub-3228085068090706/4930787659',
-                  ),
+                //
+                // 위젯을 빼지 않고 hideAd 로 넘기는 이유는 레이아웃 때문이다.
+                // 통째로 빼면 그 높이만큼 화면이 출렁인다.
+                FlutterFlowAdBanner(
+                  showsTestAd: false,
+                  androidAdUnitID: 'ca-app-pub-3228085068090706/4930787659',
+                  hideAd: screenLit,
+                ),
               ],
             ),
           ),
