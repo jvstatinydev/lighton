@@ -4,6 +4,8 @@ import '/flutter_flow/flutter_flow_language_selector.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
+import '/flutter_flow/torch_util.dart'
+    show kShowTorchDiagnostics, torchStatus;
 import '/actions/actions.dart' as action_blocks;
 import '/custom_code/actions/index.dart' as actions;
 import 'package:flutter/material.dart';
@@ -363,6 +365,20 @@ class _HomePageWidgetState extends State<HomePageWidget>
                     ],
                   ).animateOnPageLoad(animationsMap['rowOnPageLoadAnimation']!),
                 ),
+                if (kShowTorchDiagnostics)
+                  Container(
+                    color: Colors.black,
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(8.0),
+                    child: Text(
+                      torchStatus.describe(),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 10.0,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
                 FlutterFlowAdBanner(
                   showsTestAd: false,
                   androidAdUnitID: 'ca-app-pub-3228085068090706/4930787659',

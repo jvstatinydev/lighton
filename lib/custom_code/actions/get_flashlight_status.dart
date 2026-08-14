@@ -7,13 +7,9 @@ import 'package:flutter/material.dart';
 // Begin custom action code
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
 
-// Set your action name, define your arguments and return parameter,
-// and then add the boilerplate code using the green button on the right!
-import 'package:torch_controller/torch_controller.dart';
+// 실제 구현은 torch_util 에 있다. toggle_flashlight.dart 의 설명 참고.
+import '/flutter_flow/torch_util.dart' as torch;
 
-TorchController controller = TorchController();
-
-Future<bool?> getFlashlightStatus() async {
-  return controller.isTorchActive;
-  ;
+Future<bool> getFlashlightStatus() async {
+  return torch.isTorchOn();
 }
