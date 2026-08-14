@@ -54,7 +54,7 @@ jobs:
       # 테스트를 돌린 적이 없어 드러나지 않았을 뿐이다. 그 파일을 고치는 것은
       # 별도 작업이므로, 여기서는 검증할 수 있는 것만 돌린다.
       - name: Test
-        run: flutter test test/torch_util_test.dart
+        run: flutter test test/torch_util_test.dart test/screen_light_test.dart
 
       - name: Build release APK
         run: flutter build apk --release

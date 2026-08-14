@@ -5,7 +5,7 @@ import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import '/flutter_flow/torch_util.dart'
-    show kShowTorchDiagnostics, torchStatus;
+    show kShowTorchDiagnostics, torchStatus, usesScreenLight;
 import '/actions/actions.dart' as action_blocks;
 import '/custom_code/actions/index.dart' as actions;
 import 'package:flutter/material.dart';
@@ -144,8 +144,14 @@ class _HomePageWidgetState extends State<HomePageWidget>
   Widget build(BuildContext context) {
     context.watch<FFAppState>();
 
+    // 플래시가 없어 화면을 조명으로 쓰는 기기에서, 조명이 켜져 있는 동안.
+    // 이때는 테마(다크 모드 포함)와 무관하게 화면을 최대한 하얗게 만든다.
+    // 빛을 내는 것이 목적이므로 색이 있는 영역은 그만큼 빛을 깎아먹는다.
+    final screenLit = usesScreenLight && FFAppState().isFlashOn;
+
     return Opacity(
-      opacity: 0.9,
+      // 화면을 조명으로 쓰는 동안에는 빛을 깎지 않는다.
+      opacity: screenLit ? 1.0 : 0.9,
       child: GestureDetector(
         onTap: () {
           FocusScope.of(context).unfocus();
@@ -153,9 +159,13 @@ class _HomePageWidgetState extends State<HomePageWidget>
         },
         child: Scaffold(
           key: scaffoldKey,
-          backgroundColor: FlutterFlowTheme.of(context).secondaryBackground,
+          backgroundColor: screenLit
+              ? Colors.white
+              : FlutterFlowTheme.of(context).secondaryBackground,
           appBar: AppBar(
-            backgroundColor: FlutterFlowTheme.of(context).primaryBackground,
+            backgroundColor: screenLit
+                ? Colors.white
+                : FlutterFlowTheme.of(context).primaryBackground,
             automaticallyImplyLeading: false,
             title: Text(
               FFLocalizations.of(context).getText(
@@ -169,7 +179,9 @@ class _HomePageWidgetState extends State<HomePageWidget>
                       fontStyle:
                           FlutterFlowTheme.of(context).headlineMedium.fontStyle,
                     ),
-                    color: FlutterFlowTheme.of(context).primaryText,
+                    color: screenLit
+                        ? Colors.black
+                        : FlutterFlowTheme.of(context).primaryText,
                     fontSize: 22.0,
                     letterSpacing: 0.0,
                     fontWeight:
@@ -188,6 +200,39 @@ class _HomePageWidgetState extends State<HomePageWidget>
               mainAxisSize: MainAxisSize.max,
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
+                if (usesScreenLight)
+                  Flexible(
+                    // 시스템 글꼴을 크게 키운 사용자에게도 문구가 잘리면 안
+                    // 된다. 글자를 줄이는 대신(FittedBox 같은 것) 필요하면
+                    // 스크롤되게 둔다. 읽을 수 있는 크기가 우선이다.
+                    child: SingleChildScrollView(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16.0,
+                          vertical: 12.0,
+                        ),
+                        child: Text(
+                          FFLocalizations.of(context).getText(
+                            'n4v8t2q6' /* 이 기기는 플래시가 없어 화면을 밝힙니다 */,
+                          ),
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            // 눈이 좋지 않은 분들이 읽을 수 있어야 한다.
+                            // 시스템 글꼴 배율은 Flutter 가 여기에 곱해 주므로
+                            // 따로 막지 않는다.
+                            fontSize: 20.0,
+                            fontWeight: FontWeight.w600,
+                            height: 1.4,
+                            // 조명이 켜지면 배경이 흰색이 되므로 대비를 위해
+                            // 검정으로 바꾼다.
+                            color: screenLit
+                                ? Colors.black
+                                : FlutterFlowTheme.of(context).primaryText,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 Row(
                   mainAxisSize: MainAxisSize.max,
                   mainAxisAlignment: MainAxisAlignment.end,
@@ -196,7 +241,10 @@ class _HomePageWidgetState extends State<HomePageWidget>
                     Container(
                       width: MediaQuery.sizeOf(context).width * 0.6,
                       decoration: BoxDecoration(
-                        color: FlutterFlowTheme.of(context).secondaryBackground,
+                        color: screenLit
+                            ? Colors.white
+                            : FlutterFlowTheme.of(context)
+                                .secondaryBackground,
                       ),
                       child: FlutterFlowLanguageSelector(
                         backgroundColor:
@@ -332,7 +380,9 @@ class _HomePageWidgetState extends State<HomePageWidget>
                                 iconAlignment: IconAlignment.start,
                                 iconPadding: EdgeInsetsDirectional.fromSTEB(
                                     0.0, 0.0, 0.0, 0.0),
-                                color: Color(0xFF38B6A8),
+                                color: screenLit
+                                    ? Colors.white
+                                    : Color(0xFF38B6A8),
                                 textStyle: FlutterFlowTheme.of(context)
                                     .titleSmall
                                     .override(
@@ -344,7 +394,9 @@ class _HomePageWidgetState extends State<HomePageWidget>
                                             .titleSmall
                                             .fontStyle,
                                       ),
-                                      color: Colors.white,
+                                      color: screenLit
+                                          ? Colors.black
+                                          : Colors.white,
                                       fontSize: 60.0,
                                       letterSpacing: 0.0,
                                       fontWeight: FlutterFlowTheme.of(context)

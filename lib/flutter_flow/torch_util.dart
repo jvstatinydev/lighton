@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart' show debugPrint, immutable, kIsWeb;
 import 'package:flutter/services.dart';
 
+import 'screen_light_util.dart';
+
 /// 카메라 목록과 선택 결과를 화면에 그릴지 여부.
 ///
 /// adb 를 쓸 수 없어 logcat 을 볼 수 없으므로(CLAUDE.md 의 `adb` 항목 참고)
@@ -120,8 +122,22 @@ class TorchStatus {
       ].join('\n');
 }
 
+/// 플래시를 쓸 수 없어 화면 조명으로 대체해야 하는가.
+///
+/// 규칙 자체는 한 줄이지만 이름을 붙여 둔다. 플래시가 없는 기기에서 앱이
+/// 무엇을 하는지가 이 한 줄에 달려 있고, 테스트로 고정해 둘 만하다.
+bool shouldUseScreenLight(TorchCamera? chosen) => chosen == null;
+
 /// 진단 표시가 읽는 값.
 TorchStatus torchStatus = const TorchStatus();
+
+bool _usesScreenLight = false;
+
+/// 이 기기가 플래시 대신 화면 조명을 쓰는지.
+///
+/// 화면이 흰색이어야 하는지, 안내 문구를 띄워야 하는지를 위젯이 이 값으로
+/// 판단한다. 카메라 조회가 끝나야 정해지므로 페이지 진입 직후에는 false 다.
+bool get usesScreenLight => _usesScreenLight;
 
 TorchCamera? _chosen;
 
@@ -152,6 +168,7 @@ Future<TorchCamera?> _ensureCamera() async {
       forceCameraWithoutFlash: kForceTorchCameraWithoutFlash,
     );
     _chosen = chosen;
+    _usesScreenLight = shouldUseScreenLight(chosen);
     torchStatus = TorchStatus(
       cameras: cameras,
       chosen: chosen,
@@ -173,7 +190,9 @@ Future<TorchCamera?> _ensureCamera() async {
 Future<bool> toggleTorch() async {
   final camera = await _ensureCamera();
   if (camera == null) {
-    return false;
+    // 플래시가 없는 기기다. 아무 일도 일어나지 않게 두지 않고 화면을
+    // 조명으로 쓴다. 위젯이 usesScreenLight 를 보고 화면을 하얗게 만든다.
+    return setScreenLight(!screenLightOn);
   }
 
   final target = !await isTorchOn();
@@ -199,7 +218,8 @@ Future<bool> toggleTorch() async {
 Future<bool> isTorchOn() async {
   final camera = await _ensureCamera();
   if (camera == null) {
-    return false;
+    // 화면 조명으로 대체된 기기에서는 그쪽 상태가 곧 "켜져 있는지" 다.
+    return screenLightOn;
   }
   try {
     final on = await _channel.invokeMethod<bool>('isTorchOn', {
