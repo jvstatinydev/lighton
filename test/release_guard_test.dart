@@ -2,7 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:light_on_flashlight/flutter_flow/flutter_flow_ad_banner.dart'
     show kShowAdBannerDiagnostics;
 import 'package:light_on_flashlight/flutter_flow/torch_util.dart'
-    show kForceTorchCameraWithoutFlash, kShowTorchDiagnostics;
+    show kForceNoFlash, kShowTorchDiagnostics;
 
 /// 출시 빌드에 들어가면 안 되는 상수들.
 ///
@@ -20,9 +20,10 @@ void main() {
       expect(kShowTorchDiagnostics, isFalse);
     });
 
-    test('플래시 카메라 강제 선택', () {
-      // 켜진 채로 나가면 플래시가 아예 켜지지 않는다.
-      expect(kForceTorchCameraWithoutFlash, isFalse);
+    test('플래시 없는 기기 강제 흉내', () {
+      // 켜진 채로 나가면 플래시가 멀쩡한 기기에서도 플래시가 켜지지 않고
+      // 화면 조명으로 동작한다.
+      expect(kForceNoFlash, isFalse);
     });
 
     test('광고 배너 진단 표시', () {

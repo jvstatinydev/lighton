@@ -10,11 +10,15 @@ import 'screen_light_util.dart';
 /// 조사용 빌드에서 true 로 두고 Play 출시 전에 false 로 되돌린다.
 const bool kShowTorchDiagnostics = false;
 
-/// 일부러 플래시 없는 카메라를 골라 실패 경로를 재현한다.
+/// 이 기기에 쓸 수 있는 플래시가 없는 것처럼 행동한다.
 ///
-/// "플래시가 없는 기기" 를 따로 구하지 않아도, 손에 있는 기기의 전면 카메라로
-/// 같은 상황을 만들 수 있다. 조사용이며 출시 빌드에서는 반드시 false 여야 한다.
-const bool kForceTorchCameraWithoutFlash = true;
+/// 화면 조명은 플래시가 없는 기기에서만 보이는 화면이라, 그런 기기를 구하지
+/// 못하면 확인할 방법이 없다. 이 스위치를 켜면 카메라 선택이 항상 실패해
+/// (selectTorchCamera 가 null) 손에 있는 기기에서도 같은 경로를 그대로 탄다.
+///
+/// 조사용이며 출시 빌드에서는 반드시 false 여야 한다. 켜진 채로 나가면
+/// 플래시가 멀쩡한 기기에서도 플래시가 켜지지 않는다.
+const bool kForceNoFlash = true;
 
 const MethodChannel _channel = MethodChannel('lighton/torch');
 
@@ -72,18 +76,14 @@ class TorchCamera {
 /// 있지만 손전등으로 기대되는 것은 후면이다. 후면이 없으면 플래시가 있는 첫
 /// 번째를 쓰고, 플래시가 있는 카메라가 하나도 없으면 null 을 준다.
 ///
-/// [forceCameraWithoutFlash] 는 진단용이다. 플래시 없는 카메라를 일부러 골라
-/// "플래시를 못 켜는 기기" 를 손에 있는 기기에서 재현한다.
+/// [forceNoFlash] 는 진단용이다. 카메라 목록과 무관하게 "쓸 수 있는 플래시가
+/// 없다" 로 답해서, 플래시 없는 기기에서만 보이는 경로를 손에 있는 기기에서
+/// 재현한다.
 TorchCamera? selectTorchCamera(
   List<TorchCamera> cameras, {
-  bool forceCameraWithoutFlash = false,
+  bool forceNoFlash = false,
 }) {
-  if (forceCameraWithoutFlash) {
-    for (final camera in cameras) {
-      if (!camera.hasFlash) {
-        return camera;
-      }
-    }
+  if (forceNoFlash) {
     return null;
   }
 
@@ -117,7 +117,7 @@ class TorchStatus {
         '카메라 ${cameras.length}개',
         for (final camera in cameras) '  - $camera',
         '선택: ${chosen ?? '없음'}',
-        if (kForceTorchCameraWithoutFlash) '강제 모드: 플래시 없는 카메라 선택 중',
+        if (kForceNoFlash) '강제 모드: 플래시가 없는 기기처럼 동작 중',
         if (error != null) '오류: $error',
       ].join('\n');
 }
@@ -165,7 +165,7 @@ Future<TorchCamera?> _ensureCamera() async {
     }
     final chosen = selectTorchCamera(
       cameras,
-      forceCameraWithoutFlash: kForceTorchCameraWithoutFlash,
+      forceNoFlash: kForceNoFlash,
     );
     _chosen = chosen;
     _usesScreenLight = shouldUseScreenLight(chosen);

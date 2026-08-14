@@ -63,19 +63,15 @@ void main() {
       expect(selectTorchCamera([]), isNull);
     });
 
-    test('강제 모드에서는 플래시 없는 카메라를 고른다', () {
-      // 손에 있는 기기로 "플래시를 못 켜는 기기" 를 재현하기 위한 경로다.
-      expect(
-        selectTorchCamera([back, front], forceCameraWithoutFlash: true),
-        front,
-      );
+    test('강제 모드에서는 플래시가 있어도 없다고 답한다', () {
+      // 플래시 없는 기기에서만 보이는 화면 조명 경로를, 손에 있는 기기에서
+      // 재현하기 위한 것이다. null 이어야 그 경로를 탄다.
+      expect(selectTorchCamera([back, front], forceNoFlash: true), isNull);
     });
 
-    test('강제 모드인데 전부 플래시가 있으면 null', () {
-      expect(
-        selectTorchCamera([back], forceCameraWithoutFlash: true),
-        isNull,
-      );
+    test('강제 모드는 카메라 목록과 무관하게 null', () {
+      expect(selectTorchCamera([back], forceNoFlash: true), isNull);
+      expect(selectTorchCamera([], forceNoFlash: true), isNull);
     });
   });
 
