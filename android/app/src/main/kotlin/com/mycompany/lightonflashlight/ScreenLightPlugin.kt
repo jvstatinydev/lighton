@@ -37,6 +37,7 @@ class ScreenLightPlugin(private val activity: Activity) : MethodChannel.MethodCa
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
             "setScreenLight" -> setScreenLight(call, result)
+            "setKeepAwake" -> setKeepAwake(call, result)
             else -> result.notImplemented()
         }
     }
@@ -56,16 +57,41 @@ class ScreenLightPlugin(private val activity: Activity) : MethodChannel.MethodCa
                     WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
                 }
                 window.attributes = params
-
-                if (on) {
-                    window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-                } else {
-                    window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-                }
             }
             result.success(on)
         } catch (e: Throwable) {
             result.error("SCREEN_LIGHT_FAILED", e.toString(), null)
+        }
+    }
+
+    /**
+     * 화면이 저절로 꺼지지 않게 한다.
+     *
+     * 조명이 켜져 있을 때만이 아니라 앱이 떠 있는 동안 계속 걸어 둔다. 불을
+     * 껐다고 화면까지 꺼져 버리면, 다시 켜려고 잠금을 풀고 앱을 찾아 들어와야
+     * 한다. 손이 불편하거나 화면이 잘 안 보이는 분들에게는 그 과정 자체가
+     * 부담이다. 손전등은 껐다 켰다 하며 쓰는 물건이다.
+     *
+     * 창 단위 플래그라 앱이 포그라운드를 벗어나면 자동으로 효력을 잃는다.
+     * 권한도 필요 없고 배터리를 몰래 잡아먹지도 않는다.
+     */
+    private fun setKeepAwake(call: MethodCall, result: MethodChannel.Result) {
+        val on = call.argument<Boolean>("on") ?: false
+        try {
+            activity.runOnUiThread {
+                if (on) {
+                    activity.window.addFlags(
+                        WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+                    )
+                } else {
+                    activity.window.clearFlags(
+                        WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+                    )
+                }
+            }
+            result.success(on)
+        } catch (e: Throwable) {
+            result.error("KEEP_AWAKE_FAILED", e.toString(), null)
         }
     }
 }

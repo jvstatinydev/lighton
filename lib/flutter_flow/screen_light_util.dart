@@ -34,3 +34,23 @@ Future<bool> setScreenLight(bool on) async {
   _on = on;
   return _on;
 }
+
+/// 화면이 저절로 꺼지지 않게 한다.
+///
+/// 조명이 켜져 있을 때만이 아니라 앱이 떠 있는 동안 계속 걸어 둔다. 불을
+/// 껐다고 화면까지 꺼져 버리면, 다시 켜려고 잠금을 풀고 앱을 찾아 들어와야
+/// 한다. 손이 불편하거나 화면이 잘 안 보이는 분들에게는 그 과정 자체가
+/// 부담이다. 손전등은 껐다 켰다 하며 쓰는 물건이다.
+///
+/// 플래시가 있는 기기에서도 마찬가지로 걸어 둔다. 창 단위 플래그라 앱이
+/// 포그라운드를 벗어나면 자동으로 풀린다.
+Future<void> setKeepAwake(bool on) async {
+  if (kIsWeb) {
+    return;
+  }
+  try {
+    await _channel.invokeMethod<bool>('setKeepAwake', {'on': on});
+  } catch (e) {
+    debugPrint('ScreenLight: 화면 꺼짐 방지 설정 실패: $e');
+  }
+}

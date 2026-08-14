@@ -52,28 +52,31 @@ import AVFoundation
     _ call: FlutterMethodCall,
     _ result: @escaping FlutterResult
   ) {
-    guard call.method == "setScreenLight" else {
-      result(FlutterMethodNotImplemented)
-      return
-    }
     let arguments = call.arguments as? [String: Any]
     let on = arguments?["on"] as? Bool ?? false
 
-    if on {
-      if brightnessBeforeScreenLight == nil {
-        brightnessBeforeScreenLight = UIScreen.main.brightness
-      }
-      UIScreen.main.brightness = 1.0
-      // 화면이 꺼지면 조명이 무의미해진다.
-      UIApplication.shared.isIdleTimerDisabled = true
-    } else {
-      if let previous = brightnessBeforeScreenLight {
+    switch call.method {
+    case "setScreenLight":
+      if on {
+        if brightnessBeforeScreenLight == nil {
+          brightnessBeforeScreenLight = UIScreen.main.brightness
+        }
+        UIScreen.main.brightness = 1.0
+      } else if let previous = brightnessBeforeScreenLight {
         UIScreen.main.brightness = previous
         brightnessBeforeScreenLight = nil
       }
-      UIApplication.shared.isIdleTimerDisabled = false
+      result(on)
+
+    case "setKeepAwake":
+      // 조명이 켜져 있을 때만이 아니라 앱이 떠 있는 동안 계속 걸어 둔다.
+      // 불을 껐다고 화면까지 꺼지면 다시 켜기가 번거롭다.
+      UIApplication.shared.isIdleTimerDisabled = on
+      result(on)
+
+    default:
+      result(FlutterMethodNotImplemented)
     }
-    result(on)
   }
 
   private static func torchDevice() -> AVCaptureDevice? {
