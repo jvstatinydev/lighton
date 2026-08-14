@@ -16,25 +16,26 @@ name: Emulator Visual Check
 #   - 광고 초기화 순서(ensureAdMobReady → initialize → 배너 요청). 에뮬레이터는
 #     AdMob 자동 테스트 기기라 테스트 광고가 실제로 뜬다. 1.0.4+14 에서 광고를
 #     조용히 죽였던 그 경합이 여기서 드러난다.
-#   - 플래시 없는 기기 경로. 에뮬레이터 카메라는 FLASH_INFO_AVAILABLE 을
-#     내걸지 않으므로, 앱 입장에서는 공짜 "플래시 없는 기기"다. 지금까지
-#     selectTorchCamera 의 null 반환 경로는 순수 함수로만 덮여 있었다.
+#   - 카메라 선택 정책. API 36 에뮬레이터는 카메라를 하나만 내놓는데 그 id 가
+#     "0" 이 아니라 "1" 이다(후면, 플래시 있음). cameraIdList[0] 을 그대로 쓰던
+#     원래 버그가 재현되는 바로 그 기기 형태라서, selectTorchCamera 의 회귀를
+#     실기기 없이 잡을 수 있다. 토글도 setTorchMode 예외 없이 통과한다.
 #   - SafeArea / edge-to-edge. targetSdk 35+ 라 상태바·제스처바가 실제로 그려진
 #     화면을 봐야 하는데, 골든 테스트로는 안드로이드 크롬이 안 나온다.
 #   - 세로/가로 배너 배치.
 #
-# 검증 안 되는 것: 실제 토치 점등. 에뮬레이터에 플래시가 없다. 그건 여전히
-# 실기기(.claude/skills/samsung-rtl) 몫이고, 이 워크플로는 그 대체가 아니라 보완이다.
+# 검증 안 되는 것: 빛이 실제로 나오는지. setTorchMode 가 성공했다는 것까지만
+# 알 수 있고 발광 여부는 알 수 없다. 그건 여전히 실기기(.claude/skills/samsung-rtl)
+# 몫이고, 이 워크플로는 그 대체가 아니라 보완이다.
 #
 # 게이트가 아니라 진단 도구이므로 수동 실행 전용이다. 에뮬레이터 잡은 부팅까지
 # 10분대라 모든 푸시에 걸면 build-apk.yml 보다 비싸진다.
 
+# 주의: workflow_dispatch 워크플로는 파일이 *기본 브랜치에* 있어야 실행할 수 있다.
+# 이게 main 에 들어가기 전에는 API 든 웹이든 404 가 나므로, 브랜치에서 돌려보려면
+# push 트리거를 임시로 붙였다 떼야 한다. main 에 들어간 뒤에는 ref 를 골라
+# 아무 브랜치에나 dispatch 할 수 있다.
 on:
-  # TEMPORARY: 검증용. workflow_dispatch 는 기본 브랜치에 파일이 있어야 실행되므로
-  # main 에 들어가기 전에는 이 워크플로를 한 번도 돌려볼 수 없다. 확인 후 제거한다.
-  push:
-    branches:
-      - claude/blog-review-applicability-s4mszj
   workflow_dispatch:
     inputs:
       api-level:
