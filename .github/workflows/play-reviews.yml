@@ -122,7 +122,14 @@ jobs:
               batch = body.get("reviews", [])
               reviews.extend(batch)
               token = body.get("tokenPagination", {}).get("nextPageToken")
-              print(f"{page}페이지: {len(batch)}건 (누적 {len(reviews)}건)")
+
+              # 0건이 나왔을 때 "API가 정말 빈 목록을 줬다" 와 "여기서 파싱이
+              # 어긋났다" 를 로그만 보고 구분할 수 있어야 한다. 응답 본문은
+              # 리뷰 내용과 작성자 이름을 담고 있고 이 레포의 Actions 로그는
+              # 공개이므로, 내용은 찍지 않고 구조만 찍는다.
+              print(f"{page}페이지: {len(batch)}건 (누적 {len(reviews)}건)"
+                    f"  [HTTP {r.status_code}, 응답 {len(r.text)}바이트,"
+                    f" 최상위 키 {sorted(body.keys())}]")
               if not token:
                   break
 
