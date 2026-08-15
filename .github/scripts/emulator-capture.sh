@@ -39,13 +39,41 @@ echo "::endgroup::"
 echo "Waiting ${SETTLE_SECONDS}s for the app to settle..."
 sleep "$SETTLE_SECONDS"
 
+# 화면을 돌린다.
+#
+# `settings put system user_rotation` 은 API 36 에서 먹히지 않았다. 값은
+# 들어가는데 디스플레이는 ROTATION_0 그대로였고, 그래서 "가로" 라는 이름이
+# 붙은 세로 스크린샷 네 장이 나왔다. 실패가 조용해서 결과만 보면 앱이 회전을
+# 안 하는 것처럼 보인다.
+#
+# Android 12 부터 있는 `cmd window set-user-rotation` 을 먼저 쓰고, 없으면
+# 예전 방식으로 물러선다. 어느 쪽이든 실제로 돌았는지 확인해서 기록한다.
+rotate() {
+  local rotation="$1"
+  adb shell cmd window set-user-rotation lock -d 0 "$rotation" >/dev/null 2>&1 \
+    || adb shell settings put system user_rotation "$rotation" >/dev/null 2>&1 \
+    || true
+  # 회전 후 레이아웃이 다시 잡히기를 기다린다.
+  sleep 6
+}
+
+# 디스플레이가 실제로 어느 방향인지 읽는다. 못 읽으면 빈 문자열.
+actual_rotation() {
+  adb shell dumpsys window displays 2>/dev/null \
+    | grep -o 'mDisplayRotation=ROTATION_[0-9]*' | head -1 | sed 's/.*ROTATION_//'
+}
+
 capture() {
   local rotation="$1" name="$2"
-  adb shell settings put system user_rotation "$rotation"
-  # 회전 후 레이아웃이 다시 잡히기를 기다린다. 배너는 방향에 따라 배치가 달라진다.
-  sleep 6
+  rotate "$rotation"
+  local got
+  got="$(actual_rotation)"
   adb exec-out screencap -p >"$OUT/${name}.png"
-  echo "captured $OUT/${name}.png"
+  echo "captured $OUT/${name}.png (요청 rotation=$rotation, 실제 ROTATION_${got:-?})"
+  echo "${name} requested=${rotation} actual=${got:-unknown}" >>"$OUT/rotation-log.txt"
+  if [ -n "$got" ] && [ "$got" != "$rotation" ]; then
+    echo "::warning::${name}: 회전이 요청대로 적용되지 않았습니다 (요청 $rotation, 실제 $got)"
+  fi
 }
 
 capture 0 01-portrait
@@ -58,6 +86,9 @@ capture 0 03-portrait-again
 # 좌표는 화면 크기에서 계산한다. 토글은 Align(0.0, 0.0) 으로 가운데에 있으므로
 # (lib/pages/home_page/home_page_widget.dart) 화면 중앙을 누르면 닿는다.
 # 하드코딩하면 profile 이나 API 레벨을 바꿨을 때 조용히 빗나간다.
+# 탭 전에 세로로 되돌린다. 좌표를 세로 기준으로 계산하기 때문이다.
+rotate 0
+
 echo "::group::Tap center (torch button)"
 SIZE="$(adb shell wm size | tail -1 | tr -d '\r' | sed 's/.*: //')"
 TAP_X=$(( ${SIZE%x*} / 2 ))

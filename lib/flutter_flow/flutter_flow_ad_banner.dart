@@ -25,6 +25,7 @@ class FlutterFlowAdBanner extends StatefulWidget {
     required this.showsTestAd,
     this.iOSAdUnitID,
     this.androidAdUnitID,
+    this.hideAd = false,
   }) : super(key: key);
 
   final double? width;
@@ -32,6 +33,16 @@ class FlutterFlowAdBanner extends StatefulWidget {
   final bool showsTestAd;
   final String? iOSAdUnitID;
   final String? androidAdUnitID;
+
+  /// 광고를 감추되 차지하던 자리는 그대로 둔다.
+  ///
+  /// 화면 조명을 켜면 배너를 감추는데, 위젯을 통째로 빼면 그만큼 레이아웃이
+  /// 줄어들면서 화면 전체가 출렁인다. 자리를 유지하고 흰색으로 덮으면
+  /// 껐다 켤 때 아무것도 움직이지 않는다.
+  ///
+  /// AdWidget 자체를 그리지 않으므로, 보이지 않는 광고가 노출로 잡히지도
+  /// 않는다. 로드된 배너는 그대로 두어 다시 켤 때 즉시 나타난다.
+  final bool hideAd;
 
   @override
   _FlutterFlowAdBannerState createState() => _FlutterFlowAdBannerState();
@@ -76,10 +87,6 @@ class _FlutterFlowAdBannerState extends State<FlutterFlowAdBanner> {
     _loading = true;
     _attempt++;
 
-    // 화면 크기는 await 전에 읽어둔다. await 뒤에 context 를 다시 만지면
-    // 위젯이 사라진 뒤일 수 있다.
-    final screen = MediaQuery.sizeOf(context);
-
     // 광고를 요청하기 전에 동의 수집과 SDK 초기화가 끝나기를 기다린다.
     // 예전에는 기다리지 않고 첫 프레임에 곧장 요청했고, 초기화가 끝나기 전에
     // 나간 그 한 번의 요청이 실패하면 재시도가 없어 그대로 끝이었다.
@@ -96,22 +103,22 @@ class _FlutterFlowAdBannerState extends State<FlutterFlowAdBanner> {
       return;
     }
 
-    final AdSize? size = widget.width != null && widget.height != null
+    // 크기를 화면에 맞춰 계산하지 않고 320x50 으로 고정한다.
+    //
+    // 어댑티브 배너는 화면 방향과 크기에 따라 높이가 달라진다. 가로모드에서는
+    // 화면 높이가 얼마 안 되는데 배너가 세로 자리를 가져가서 손전등 버튼이
+    // 위아래로 짜부라졌다. 방향을 바꿀 때마다 배너를 다시 받아야 하는 것도
+    // 그 때문이었다.
+    //
+    // 고정 크기면 세로든 가로든 같은 높이의 막대 하나다. 버튼이 쓸 수 있는
+    // 자리가 방향에 따라 흔들리지 않고, 회전해도 다시 받을 필요가 없다.
+    // 320x50 은 가장 오래된 규격이라 채워지는 광고도 가장 많다.
+    final AdSize size = widget.width != null && widget.height != null
         ? AdSize(
             height: widget.height!.toInt(),
             width: widget.width!.toInt(),
           )
-        : await AdSize.getLargeAnchoredAdaptiveBannerAdSizeWithOrientation(
-            widget.width == null ? Orientation.portrait : Orientation.landscape,
-            widget.width == null
-                ? screen.width.truncate()
-                : screen.height.truncate(),
-          );
-
-    if (size == null) {
-      _fail('배너 크기를 계산하지 못했습니다.');
-      return;
-    }
+        : AdSize.banner;
 
     final isAndroid = !kIsWeb && Platform.isAndroid;
     final banner = BannerAd(
@@ -182,7 +189,10 @@ class _FlutterFlowAdBannerState extends State<FlutterFlowAdBanner> {
         alignment: Alignment.center,
         width: banner.size.width.toDouble(),
         height: banner.size.height.toDouble(),
-        child: adWidget,
+        // 감출 때는 같은 크기의 흰 자리로 남긴다. 크기가 그대로라 레이아웃이
+        // 움직이지 않고, 조명 중에는 배경과 같은 흰색이라 눈에 띄지도 않는다.
+        color: widget.hideAd ? Colors.white : null,
+        child: widget.hideAd ? null : adWidget,
       );
     }
 

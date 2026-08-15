@@ -13,7 +13,13 @@ import AVFoundation
   // 별도 Swift 파일 대신 여기에 두는 이유는, 새 파일을 Runner 타깃에 넣으려면
   // project.pbxproj 를 손으로 고쳐야 하고 그쪽이 훨씬 깨지기 쉽기 때문이다.
   private static let torchChannelName = "lighton/torch"
+  private static let screenLightChannelName = "lighton/screen_light"
   private static let torchCameraId = "default"
+
+  /// 화면 조명을 켜기 전의 밝기. iOS 의 UIScreen.brightness 는 시스템 전역이고
+  /// 자동으로 복원되지 않으므로, 끌 때 직접 되돌려 줘야 한다.
+  /// (Android 는 창 단위 속성이라 시스템이 알아서 되돌린다.)
+  private static var brightnessBeforeScreenLight: CGFloat?
 
   override func application(
     _ application: UIApplication,
@@ -22,16 +28,55 @@ import AVFoundation
     GeneratedPluginRegistrant.register(with: self)
 
     if let controller = window?.rootViewController as? FlutterViewController {
-      let channel = FlutterMethodChannel(
+      let torchChannel = FlutterMethodChannel(
         name: AppDelegate.torchChannelName,
         binaryMessenger: controller.binaryMessenger
       )
-      channel.setMethodCallHandler { call, result in
+      torchChannel.setMethodCallHandler { call, result in
         AppDelegate.handleTorchCall(call, result)
+      }
+
+      let screenLightChannel = FlutterMethodChannel(
+        name: AppDelegate.screenLightChannelName,
+        binaryMessenger: controller.binaryMessenger
+      )
+      screenLightChannel.setMethodCallHandler { call, result in
+        AppDelegate.handleScreenLightCall(call, result)
       }
     }
 
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+  }
+
+  private static func handleScreenLightCall(
+    _ call: FlutterMethodCall,
+    _ result: @escaping FlutterResult
+  ) {
+    let arguments = call.arguments as? [String: Any]
+    let on = arguments?["on"] as? Bool ?? false
+
+    switch call.method {
+    case "setScreenLight":
+      if on {
+        if brightnessBeforeScreenLight == nil {
+          brightnessBeforeScreenLight = UIScreen.main.brightness
+        }
+        UIScreen.main.brightness = 1.0
+      } else if let previous = brightnessBeforeScreenLight {
+        UIScreen.main.brightness = previous
+        brightnessBeforeScreenLight = nil
+      }
+      result(on)
+
+    case "setKeepAwake":
+      // 조명이 켜져 있을 때만이 아니라 앱이 떠 있는 동안 계속 걸어 둔다.
+      // 불을 껐다고 화면까지 꺼지면 다시 켜기가 번거롭다.
+      UIApplication.shared.isIdleTimerDisabled = on
+      result(on)
+
+    default:
+      result(FlutterMethodNotImplemented)
+    }
   }
 
   private static func torchDevice() -> AVCaptureDevice? {

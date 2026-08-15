@@ -4,8 +4,11 @@ import '/flutter_flow/flutter_flow_language_selector.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
+import '/flutter_flow/screen_light_notice.dart'
+    show showScreenLightNoticeOnce;
+import '/flutter_flow/screen_light_util.dart' show setKeepAwake;
 import '/flutter_flow/torch_util.dart'
-    show kShowTorchDiagnostics, torchStatus;
+    show kShowTorchDiagnostics, torchStatus, usesScreenLight;
 import '/actions/actions.dart' as action_blocks;
 import '/custom_code/actions/index.dart' as actions;
 import 'package:flutter/material.dart';
@@ -39,11 +42,22 @@ class _HomePageWidgetState extends State<HomePageWidget>
     super.initState();
     _model = createModel(context, () => HomePageModel());
 
+    // 손전등 화면이 떠 있는 동안에는 화면이 저절로 꺼지지 않게 한다.
+    // 불이 꺼져 있어도 마찬가지다. 다시 켜려고 잠금을 풀고 앱을 찾아 들어오는
+    // 과정이 부담인 분들이 있다.
+    setKeepAwake(true);
+
     // On page load action.
     SchedulerBinding.instance.addPostFrameCallback((_) async {
       _model.isFlashOnInit = await actions.getFlashlightStatus();
       FFAppState().isFlashOn = _model.isFlashOnInit!;
       FFAppState().update(() {});
+
+      // 플래시가 없어 화면을 조명으로 쓰는 기기라면, 왜 화면이 하얘지는지
+      // 처음 한 번 설명한다. 위 호출로 카메라 조회가 끝나야 알 수 있다.
+      if (usesScreenLight && mounted) {
+        await showScreenLightNoticeOnce(context);
+      }
       await Future.delayed(const Duration(milliseconds: 100));
       if (FFAppState().isFlashOn) {
         // button on animation
@@ -135,6 +149,9 @@ class _HomePageWidgetState extends State<HomePageWidget>
 
   @override
   void dispose() {
+    // 화면을 떠나면 원래대로 되돌린다. 창 단위 플래그라 앱이 백그라운드로
+    // 가면 어차피 풀리지만, 명시적으로 정리해 둔다.
+    setKeepAwake(false);
     _model.dispose();
 
     super.dispose();
@@ -144,8 +161,14 @@ class _HomePageWidgetState extends State<HomePageWidget>
   Widget build(BuildContext context) {
     context.watch<FFAppState>();
 
+    // 플래시가 없어 화면을 조명으로 쓰는 기기에서, 조명이 켜져 있는 동안.
+    // 이때는 테마(다크 모드 포함)와 무관하게 화면을 최대한 하얗게 만든다.
+    // 빛을 내는 것이 목적이므로 색이 있는 영역은 그만큼 빛을 깎아먹는다.
+    final screenLit = usesScreenLight && FFAppState().isFlashOn;
+
     return Opacity(
-      opacity: 0.9,
+      // 화면을 조명으로 쓰는 동안에는 빛을 깎지 않는다.
+      opacity: screenLit ? 1.0 : 0.9,
       child: GestureDetector(
         onTap: () {
           FocusScope.of(context).unfocus();
@@ -153,9 +176,13 @@ class _HomePageWidgetState extends State<HomePageWidget>
         },
         child: Scaffold(
           key: scaffoldKey,
-          backgroundColor: FlutterFlowTheme.of(context).secondaryBackground,
+          backgroundColor: screenLit
+              ? Colors.white
+              : FlutterFlowTheme.of(context).secondaryBackground,
           appBar: AppBar(
-            backgroundColor: FlutterFlowTheme.of(context).primaryBackground,
+            backgroundColor: screenLit
+                ? Colors.white
+                : FlutterFlowTheme.of(context).primaryBackground,
             automaticallyImplyLeading: false,
             title: Text(
               FFLocalizations.of(context).getText(
@@ -169,7 +196,9 @@ class _HomePageWidgetState extends State<HomePageWidget>
                       fontStyle:
                           FlutterFlowTheme.of(context).headlineMedium.fontStyle,
                     ),
-                    color: FlutterFlowTheme.of(context).primaryText,
+                    color: screenLit
+                        ? Colors.black
+                        : FlutterFlowTheme.of(context).primaryText,
                     fontSize: 22.0,
                     letterSpacing: 0.0,
                     fontWeight:
@@ -178,7 +207,46 @@ class _HomePageWidgetState extends State<HomePageWidget>
                         FlutterFlowTheme.of(context).headlineMedium.fontStyle,
                   ),
             ),
-            actions: [],
+            actions: [
+              // 언어 선택기는 원래 본문에 한 줄을 따로 차지하고 있었다.
+              // 상단바로 올리면 세로 한 단이 통째로 비어서, 글꼴을 크게 키운
+              // 사용자에게 안내 문구가 잘리는 것도 그만큼 덜해진다.
+              Padding(
+                padding: const EdgeInsetsDirectional.only(end: 8.0),
+                child: FlutterFlowLanguageSelector(
+                  width: MediaQuery.sizeOf(context).width * 0.45,
+                  // 상단바 색을 그대로 비친다. 예전에는 테마색을 직접 넣어서
+                  // 화면이 하얘졌을 때 여기만 색이 남아 이질감이 있었다.
+                  backgroundColor: Colors.transparent,
+                  borderColor: Colors.transparent,
+                  borderRadius: 0.0,
+                  dropdownColor: screenLit
+                      ? Colors.white
+                      : FlutterFlowTheme.of(context).secondaryBackground,
+                  dropdownIconColor: screenLit
+                      ? Colors.black
+                      : FlutterFlowTheme.of(context).secondaryText,
+                  textStyle: FlutterFlowTheme.of(context).bodyLarge.override(
+                        font: GoogleFonts.inter(
+                          fontWeight:
+                              FlutterFlowTheme.of(context).bodyLarge.fontWeight,
+                          fontStyle:
+                              FlutterFlowTheme.of(context).bodyLarge.fontStyle,
+                        ),
+                        color: screenLit
+                            ? Colors.black
+                            : FlutterFlowTheme.of(context).primaryText,
+                        letterSpacing: 0.0,
+                      ),
+                  hideFlags: false,
+                  flagSize: 16.0,
+                  flagTextGap: 8.0,
+                  currentLanguage: FFLocalizations.of(context).languageCode,
+                  languages: FFLocalizations.languages(),
+                  onChanged: (lang) => setAppLanguage(context, lang),
+                ),
+              ),
+            ],
             centerTitle: false,
             elevation: 2.0,
           ),
@@ -188,52 +256,6 @@ class _HomePageWidgetState extends State<HomePageWidget>
               mainAxisSize: MainAxisSize.max,
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  mainAxisSize: MainAxisSize.max,
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: MediaQuery.sizeOf(context).width * 0.6,
-                      decoration: BoxDecoration(
-                        color: FlutterFlowTheme.of(context).secondaryBackground,
-                      ),
-                      child: FlutterFlowLanguageSelector(
-                        backgroundColor:
-                            FlutterFlowTheme.of(context).secondaryBackground,
-                        borderColor: Colors.transparent,
-                        dropdownIconColor:
-                            FlutterFlowTheme.of(context).secondaryText,
-                        borderRadius: 0.0,
-                        textStyle:
-                            FlutterFlowTheme.of(context).bodyLarge.override(
-                                  font: GoogleFonts.inter(
-                                    fontWeight: FlutterFlowTheme.of(context)
-                                        .bodyLarge
-                                        .fontWeight,
-                                    fontStyle: FlutterFlowTheme.of(context)
-                                        .bodyLarge
-                                        .fontStyle,
-                                  ),
-                                  letterSpacing: 0.0,
-                                  fontWeight: FlutterFlowTheme.of(context)
-                                      .bodyLarge
-                                      .fontWeight,
-                                  fontStyle: FlutterFlowTheme.of(context)
-                                      .bodyLarge
-                                      .fontStyle,
-                                ),
-                        hideFlags: false,
-                        flagSize: 16.0,
-                        flagTextGap: 8.0,
-                        currentLanguage:
-                            FFLocalizations.of(context).languageCode,
-                        languages: FFLocalizations.languages(),
-                        onChanged: (lang) => setAppLanguage(context, lang),
-                      ),
-                    ),
-                  ],
-                ),
                 Expanded(
                   flex: 6,
                   child: Row(
@@ -332,7 +354,9 @@ class _HomePageWidgetState extends State<HomePageWidget>
                                 iconAlignment: IconAlignment.start,
                                 iconPadding: EdgeInsetsDirectional.fromSTEB(
                                     0.0, 0.0, 0.0, 0.0),
-                                color: Color(0xFF38B6A8),
+                                color: screenLit
+                                    ? Colors.white
+                                    : Color(0xFF38B6A8),
                                 textStyle: FlutterFlowTheme.of(context)
                                     .titleSmall
                                     .override(
@@ -344,7 +368,9 @@ class _HomePageWidgetState extends State<HomePageWidget>
                                             .titleSmall
                                             .fontStyle,
                                       ),
-                                      color: Colors.white,
+                                      color: screenLit
+                                          ? Colors.black
+                                          : Colors.white,
                                       fontSize: 60.0,
                                       letterSpacing: 0.0,
                                       fontWeight: FlutterFlowTheme.of(context)
@@ -379,9 +405,16 @@ class _HomePageWidgetState extends State<HomePageWidget>
                       ),
                     ),
                   ),
+                // 화면을 조명으로 쓰는 동안에만 배너를 감춘다. 그때는 배너가
+                // 빛을 깎아먹기만 하고, 화면을 등지고 비추는 상황이라 광고를
+                // 볼 사람도 없다. 조명을 끄면 다시 보인다.
+                //
+                // 위젯을 빼지 않고 hideAd 로 넘기는 이유는 레이아웃 때문이다.
+                // 통째로 빼면 그 높이만큼 화면이 출렁인다.
                 FlutterFlowAdBanner(
                   showsTestAd: false,
                   androidAdUnitID: 'ca-app-pub-3228085068090706/4930787659',
+                  hideAd: screenLit,
                 ),
               ],
             ),
