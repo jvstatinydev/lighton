@@ -1,0 +1,4 @@
+• Naprawiono problem, przez który latarka nie włączała się na niektórych urządzeniach.
+• Na urządzeniach bez lampy błyskowej ekran rozjaśnia się i może służyć zamiast latarki.
+• Wybór języka przeniesiono na górę ekranu, a przycisk i reklamę uporządkowano.
+• Ekran nie wyłącza się już sam podczas korzystania z aplikacji.
