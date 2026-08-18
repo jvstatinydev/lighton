@@ -5,8 +5,42 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'admob_util.dart' show adMobReadiness, ensureAdMobReady;
+import 'remove_ads_promo.dart' show RemoveAdsPromo;
+
+/// 몇 번에 한 번 배너 대신 "광고 제거" 프로모를 띄울지.
+///
+/// 프로모가 뜨는 실행에서는 광고를 **아예 요청하지 않는다.** 이미 로드된
+/// 광고를 다른 것으로 가리면 AdMob 정책 위반이므로, 요청 전에 정해야 한다.
+/// 그만큼 광고 노출을 포기하는 것이고, 5면 20%다.
+const int _kPromoEveryNLaunches = 5;
+
+const String _kLaunchCountKey = '__banner_launch_count__';
+
+/// 이번 실행이 프로모 차례인지. 프로세스당 한 번만 정한다.
+///
+/// 위젯의 initState 가 아니라 여기서 세는 이유는, 언어를 바꾸면 라우터가
+/// 페이지를 다시 만들어 initState 가 한 실행 안에서 여러 번 돌 수 있기
+/// 때문이다. 그러면 "실행 횟수"가 아니라 "위젯 생성 횟수"를 세게 된다.
+bool? _promoSessionDecision;
+
+Future<bool> _isPromoSession() async {
+  final bool? decided = _promoSessionDecision;
+  if (decided != null) {
+    return decided;
+  }
+  try {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final int count = (prefs.getInt(_kLaunchCountKey) ?? 0) + 1;
+    await prefs.setInt(_kLaunchCountKey, count);
+    return _promoSessionDecision = count % _kPromoEveryNLaunches == 0;
+  } catch (_) {
+    // 저장소를 못 읽으면 광고를 띄우는 쪽으로 넘어간다.
+    return _promoSessionDecision = false;
+  }
+}
 
 /// 배너가 광고를 못 띄웠을 때 그 이유를 배너 자리에 글자로 그릴지 여부.
 ///
@@ -49,6 +83,12 @@ class _FlutterFlowAdBannerState extends State<FlutterFlowAdBanner> {
   /// 화면에 그릴 실패 사유. null 이면 아직 진행 중이라는 뜻이다.
   String? _failure;
 
+  /// 이번 실행은 광고 대신 프로모를 띄우는 차례다.
+  bool _promoSession = false;
+
+  /// 재시도까지 다 쓰고 광고를 포기했다. 이 자리를 비워두느니 프로모를 그린다.
+  bool _gaveUp = false;
+
   int _attempt = 0;
   bool _loading = false;
   Timer? _retryTimer;
@@ -57,8 +97,17 @@ class _FlutterFlowAdBannerState extends State<FlutterFlowAdBanner> {
   void initState() {
     super.initState();
 
-    SchedulerBinding.instance.addPostFrameCallback((_) {
-      _load();
+    SchedulerBinding.instance.addPostFrameCallback((_) async {
+      if (await _isPromoSession()) {
+        if (mounted) {
+          setState(() => _promoSession = true);
+        }
+        // 광고를 요청하지 않는다. 로드해놓고 가리면 정책 위반이다.
+        return;
+      }
+      if (mounted) {
+        await _load();
+      }
     });
   }
 
@@ -170,7 +219,10 @@ class _FlutterFlowAdBannerState extends State<FlutterFlowAdBanner> {
     if (!mounted) {
       return;
     }
-    setState(() => _failure = reason);
+    setState(() {
+      _failure = reason;
+      _gaveUp = true;
+    });
   }
 
   @override
@@ -187,7 +239,13 @@ class _FlutterFlowAdBannerState extends State<FlutterFlowAdBanner> {
     }
 
     if (!kShowAdBannerDiagnostics) {
-      // 광고가 없으면 자리를 차지하지 않는다.
+      // 프로모 차례이거나, 광고를 끝내 못 띄웠을 때. 후자는 예전에는 그냥
+      // 빈 공간으로 접혔는데, 어차피 광고가 없는 자리이므로 잃을 것이 없다.
+      // 그리고 이 두 경우가 사용자가 "구매 복원"에 닿을 수 있는 통로다.
+      if (_promoSession || _gaveUp) {
+        return const RemoveAdsPromo();
+      }
+      // 아직 로딩 중이면 자리를 차지하지 않는다.
       return const SizedBox.shrink();
     }
 

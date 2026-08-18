@@ -363,10 +363,15 @@ class _HomePageWidgetState extends State<HomePageWidget>
                     ],
                   ).animateOnPageLoad(animationsMap['rowOnPageLoadAnimation']!),
                 ),
-                FlutterFlowAdBanner(
-                  showsTestAd: false,
-                  androidAdUnitID: 'ca-app-pub-3228085068090706/4930787659',
-                ),
+                // 광고를 제거한 사용자에게는 이 자리를 아예 언마운트한다.
+                // 숨기기만 하면(Visibility/Opacity) 배너가 살아 있어서 보이지도
+                // 않는 노출이 집계된다. 이 위젯은 배너뿐 아니라 "광고 제거"
+                // 프로모도 그리는데, 이미 산 사람에게는 둘 다 필요 없다.
+                if (!FFAppState().adsRemoved)
+                  FlutterFlowAdBanner(
+                    showsTestAd: false,
+                    androidAdUnitID: 'ca-app-pub-3228085068090706/4930787659',
+                  ),
               ],
             ),
           ),

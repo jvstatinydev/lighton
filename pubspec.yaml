@@ -40,6 +40,16 @@ dependencies:
   google_fonts: ^8.2.0
   google_mobile_ads: ^9.0.0
   in_app_purchase: ^3.3.0
+  # 위 규칙의 예외다. 보통 플랫폼 구현 패키지는 직접 적지 않지만, 결제 소유
+  # 판정에 in_app_purchase 의 공개 API 만으로는 닿을 수 없는 값이 하나 있다.
+  # restorePurchases()/queryPastPurchases() 는 응답 코드를 항상 ok 로 강제해서
+  # (pigeon_converters.dart 의 forceOkResponseCode) networkError 를 절대
+  # 보고하지 못한다. "안 샀다"와 "Play 에 못 물어봤다"가 구분이 안 되면
+  # 정상 구매자의 권한을 뺏게 된다. 그래서 billingResult.responseCode 를
+  # 직접 읽으려고 이 둘을 import 하고, import 하므로 여기에 선언한다.
+  # 자세한 근거는 lib/flutter_flow/billing_util.dart 주석에 있다.
+  in_app_purchase_android: ^0.5.2
+  in_app_purchase_platform_interface: ^1.4.1
   intl: ^0.20.2
   json_path: ^0.9.0
   page_transition: ^2.1.0

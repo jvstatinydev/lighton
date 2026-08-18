@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 import '/flutter_flow/admob_util.dart' show ensureAdMobReady;
+import '/flutter_flow/billing_util.dart' show ensureBillingReady;
 import '/flutter_flow/flutter_flow_theme.dart';
 import 'flutter_flow/flutter_flow_util.dart';
 import 'flutter_flow/internationalization.dart';
@@ -31,6 +32,12 @@ void main() async {
   // 여기서는 완료를 기다리지 않는다. 배너 쪽이 같은 Future 를 await 하므로
   // 광고 요청이 초기화를 앞질러 나가는 일은 없다.
   unawaited(ensureAdMobReady());
+
+  // "광고 제거" 권한 확인. 같은 이유로 기다리지 않는다 -- Play 가 없거나
+  // 네트워크가 없어도 손전등은 즉시 동작해야 한다. 저장된 권한은 위의
+  // initializePersistedState() 가 이미 읽었으므로 첫 프레임은 캐시로 그리고,
+  // 조회가 끝나면 FFAppState 가 알려서 다시 그려진다.
+  unawaited(ensureBillingReady());
 
   runApp(ChangeNotifierProvider(
     create: (context) => appState,
