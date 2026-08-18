@@ -100,8 +100,10 @@ jobs:
           print("판정")
           print("=" * 64)
 
-          if new.status_code == 200:
-              body = new.json()
+          # 상품이 하나도 없으면 200 + 빈 객체가 아니라 204 No Content 가 온다.
+          # 204 도 성공이므로 2xx 로 받아야 한다. 처음엔 200 만 봐서 오진했다.
+          if 200 <= new.status_code < 300:
+              body = new.json() if new.text.strip() else {}
               products = body.get("oneTimeProducts", [])
               print(f"신규 API 권한 OK. 등록된 일회성 상품 {len(products)}개")
               for p in products:
@@ -138,5 +140,5 @@ jobs:
           print()
           print(f"참고: 레거시 inappproducts 는 HTTP {old.status_code}")
 
-          raise SystemExit(0 if new.status_code == 200 else 1)
+          raise SystemExit(0 if 200 <= new.status_code < 300 else 1)
           PY

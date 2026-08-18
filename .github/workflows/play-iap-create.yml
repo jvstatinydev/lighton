@@ -1,0 +1,309 @@
+name: Create Play in-app product
+
+# "광고 제거" 일회성 상품(remove_ads)을 Play 에 등록한다.
+#
+# 왜 신규 API 인가:
+#   레거시 inappproducts 는 이 계정에서 403 이다. 본문이 그렇게 말한다 --
+#     { "code": 403, "message": "Please migrate to the new publishing API." }
+#   그래서 monetization.onetimeproducts 를 쓴다. play-iap-probe.yml 이
+#   신규 API 로 HTTP 204(권한 OK, 상품 0개)를 받아 이미 확인했다.
+#
+# 두 단계다:
+#   1. PATCH .../onetimeproducts/{productId}?allowMissing=true   -> 생성
+#   2. POST  .../oneTimeProducts/{id}/purchaseOptions:batchUpdateStates -> 활성화
+#   구매 옵션의 state 는 output-only 라 1번만으로는 DRAFT 로 남고 구매가 안 된다.
+#   반드시 2번을 해야 실제로 팔린다.
+#
+# 가격:
+#   monetization.convertRegionPrices 로 KRW 기준가를 전 지역 가격으로 변환한다.
+#   이 호출은 순수 계산이라 앱의 상품을 건드리지 않는다. 응답의 regionVersion 을
+#   그대로 PATCH 의 필수 쿼리 파라미터로 넘긴다 -- 이 값을 추측하지 않기 위해서다.
+#
+# 안전장치 (play-release-name.yml / play-track-clear.yml 과 같은 방식):
+#   기본값 apply=false 는 미리보기만 한다. 실제 호출은 apply=true 이고
+#   confirm 이 productId 를 그대로 반복할 때만 일어난다.
+#
+# edits 트랜잭션을 쓰지 않는다. onetimeproducts 는 edits 밖의 독립 리소스이고
+# 호출 즉시 반영된다. 여기에 POST /edits 를 추가하지 마라.
+#
+# 필요한 GitHub Secret:
+#   PLAY_SERVICE_ACCOUNT_JSON
+
+on:
+  workflow_dispatch:
+    inputs:
+      price_krw:
+        description: "한국 판매가 (원). 이 값을 기준으로 전 지역 가격을 변환한다."
+        required: false
+        default: "2500"
+      apply:
+        description: "true 일 때만 실제로 생성한다. 기본은 미리보기."
+        required: false
+        default: "false"
+      confirm:
+        description: "apply=true 이면 productId 를 그대로 입력해야 한다 (remove_ads)."
+        required: false
+        default: ""
+      activate:
+        description: "생성 후 구매 옵션을 활성화할지. false 면 DRAFT 로 남는다."
+        required: false
+        default: "true"
+  push:
+    branches:
+      - claude/payment-feature-zzrlaz
+
+jobs:
+  create:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Play service account secret
+        env:
+          SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          if [ -z "$SERVICE_ACCOUNT_JSON" ]; then
+            echo "::error::PLAY_SERVICE_ACCOUNT_JSON 시크릿이 필요합니다."
+            exit 1
+          fi
+
+      - name: Install Google auth library
+        run: pip install --quiet google-auth requests
+
+      - name: Create one-time product
+        env:
+          SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          PACKAGE_NAME: com.mycompany.lightonflashlight
+          PRICE_KRW: ${{ github.event.inputs.price_krw || '2500' }}
+          # push 로 도는 실행은 언제나 미리보기다. workflow_dispatch 는 이 저장소의
+          # 기본 브랜치에 이 파일이 없으면 404 로 막히므로(프로브에서 확인한 그 제약),
+          # 실제 생성은 아래 PUSH_APPLY 를 전용 커밋으로 뒤집어서 한다.
+          # 뒤집은 커밋의 diff 자체가 "의도적으로 실행했다"는 기록이 된다.
+          PUSH_APPLY: "false"
+          PUSH_CONFIRM: ""
+          APPLY: ${{ github.event.inputs.apply || '' }}
+          CONFIRM: ${{ github.event.inputs.confirm || '' }}
+          ACTIVATE: ${{ github.event.inputs.activate || 'true' }}
+        run: |
+          python3 <<'PY'
+          import json, os
+          import google.auth.transport.requests
+          from google.oauth2 import service_account
+
+          PKG = os.environ["PACKAGE_NAME"]
+          PRODUCT_ID = "remove_ads"
+          # 구매 옵션 ID 는 소문자/숫자/하이픈만 허용된다. 언더스코어는 안 된다.
+          OPTION_ID = "remove-ads"
+          PRICE_KRW = int(os.environ["PRICE_KRW"])
+          # workflow_dispatch 입력이 있으면 그것을, 없으면(push 실행) 파일 안의
+          # 리터럴을 쓴다. 둘 다 기본은 미리보기다.
+          APPLY = (os.environ["APPLY"].strip() or os.environ["PUSH_APPLY"]).lower() == "true"
+          CONFIRM = os.environ["CONFIRM"].strip() or os.environ["PUSH_CONFIRM"].strip()
+          ACTIVATE = os.environ["ACTIVATE"].strip().lower() == "true"
+
+          BASE = f"https://androidpublisher.googleapis.com/androidpublisher/v3/applications/{PKG}"
+
+          creds = service_account.Credentials.from_service_account_info(
+              json.loads(os.environ["SERVICE_ACCOUNT_JSON"]),
+              scopes=["https://www.googleapis.com/auth/androidpublisher"],
+          )
+          session = google.auth.transport.requests.AuthorizedSession(creds)
+
+          def show(r, label):
+              print(f"--- {label}: HTTP {r.status_code} ---")
+              print(r.text or "(빈 본문)")
+              print()
+              return r
+
+          def money_str(m):
+              if not m:
+                  return "-"
+              units = int(m.get("units", 0))
+              nanos = int(m.get("nanos", 0))
+              return f"{units + nanos / 1e9:,.2f} {m.get('currencyCode')}"
+
+          # ---------------------------------------------------------------
+          # 1. 가격 변환. 순수 계산이라 앱의 상품을 바꾸지 않는다.
+          # ---------------------------------------------------------------
+          print("=" * 64)
+          print(f"가격 변환: {PRICE_KRW:,} KRW 기준")
+          print("=" * 64)
+
+          conv = session.post(
+              f"{BASE}/pricing:convertRegionPrices",
+              json={"price": {"currencyCode": "KRW", "units": str(PRICE_KRW), "nanos": 0}},
+          )
+          if conv.status_code != 200:
+              show(conv, "convertRegionPrices 실패")
+              raise SystemExit(1)
+
+          body = conv.json()
+          region_prices = body.get("convertedRegionPrices", {})
+          other = body.get("convertedOtherRegionsPrice", {})
+          region_version = body.get("regionVersion", {}).get("version")
+
+          print(f"regionVersion = {region_version}   <- PATCH 의 필수 파라미터")
+          print(f"변환된 지역 수 = {len(region_prices)}")
+          print()
+
+          kr = region_prices.get("KR", {})
+          print("한국(KR):")
+          print(f"  변환가(세금 포함) = {money_str(kr.get('price'))}")
+          print(f"  이 중 세금        = {money_str(kr.get('taxAmount'))}")
+          print(f"  -> 입력한 {PRICE_KRW:,} KRW 와 다르면, 입력값이 '세금 제외'로")
+          print(f"     해석된 것이다. 표시가를 {PRICE_KRW:,} 로 맞추려면 입력을 낮춰라.")
+          print()
+
+          print("표본 지역:")
+          for rc in ["US", "JP", "GB", "DE", "IN", "BR"]:
+              if rc in region_prices:
+                  print(f"  {rc}: {money_str(region_prices[rc].get('price'))} "
+                        f"(세금 {money_str(region_prices[rc].get('taxAmount'))})")
+          print()
+          print(f"기타 지역: USD {money_str(other.get('usdPrice'))} / "
+                f"EUR {money_str(other.get('eurPrice'))}")
+          print()
+
+          # ---------------------------------------------------------------
+          # 2. 상품 본문 구성
+          # ---------------------------------------------------------------
+          configs = [
+              {
+                  "regionCode": rc,
+                  "price": info["price"],
+                  "availability": "AVAILABLE",
+              }
+              for rc, info in sorted(region_prices.items())
+              if info.get("price")
+          ]
+
+          product = {
+              "packageName": PKG,
+              "productId": PRODUCT_ID,
+              "listings": [
+                  {
+                      "languageCode": "ko-KR",
+                      "title": "광고 제거",
+                      "description": "앱 하단에 표시되는 광고를 영구히 제거합니다. 한 번만 구매하면 됩니다.",
+                  },
+                  {
+                      "languageCode": "en-US",
+                      "title": "Remove Ads",
+                      "description": "Permanently removes the banner ad at the bottom of the app. One-time purchase.",
+                  },
+              ],
+              "purchaseOptions": [
+                  {
+                      "purchaseOptionId": OPTION_ID,
+                      "buyOption": {
+                          # 레거시 PBL 흐름에서도 보이게 한다. Flutter 의
+                          # in_app_purchase 는 queryProductDetails(ProductType.inapp)
+                          # 로 조회하므로 이 값이 false 면 상품이 안 내려올 수 있다.
+                          "legacyCompatible": True,
+                          "multiQuantityEnabled": False,
+                      },
+                      "taxAndComplianceSettings": {
+                          # EEA 청약철회권. 지정 안 해도 기본값이지만 명시한다.
+                          "withdrawalRightType": "WITHDRAWAL_RIGHT_DIGITAL_CONTENT",
+                      },
+                      "regionalPricingAndAvailabilityConfigs": configs,
+                      "newRegionsConfig": {
+                          "usdPrice": other.get("usdPrice"),
+                          "eurPrice": other.get("eurPrice"),
+                          "availability": "AVAILABLE",
+                      },
+                  }
+              ],
+          }
+
+          print("=" * 64)
+          print("전송할 본문 (지역 가격은 앞 5개만 표시)")
+          print("=" * 64)
+          preview = json.loads(json.dumps(product))
+          preview["purchaseOptions"][0]["regionalPricingAndAvailabilityConfigs"] = (
+              configs[:5] + [f"... 외 {len(configs) - 5}개 지역"]
+          )
+          print(json.dumps(preview, ensure_ascii=False, indent=2))
+          print()
+
+          # ---------------------------------------------------------------
+          # 3. 게이트
+          # ---------------------------------------------------------------
+          if not APPLY:
+              print("=" * 64)
+              print("미리보기만 했다. 아무것도 만들지 않았다.")
+              print(f"실제로 만들려면 apply=true, confirm={PRODUCT_ID} 로 다시 돌려라.")
+              print("=" * 64)
+              raise SystemExit(0)
+
+          if CONFIRM != PRODUCT_ID:
+              print(f"::error::apply=true 인데 confirm 이 '{CONFIRM}' 이다. "
+                    f"'{PRODUCT_ID}' 를 그대로 입력해야 한다.")
+              raise SystemExit(1)
+
+          # ---------------------------------------------------------------
+          # 4. 생성 (upsert)
+          # ---------------------------------------------------------------
+          print("=" * 64)
+          print("상품 생성")
+          print("=" * 64)
+
+          patch = session.patch(
+              f"{BASE}/onetimeproducts/{PRODUCT_ID}",
+              params={
+                  "allowMissing": "true",
+                  "updateMask": "listings,purchaseOptions",
+                  "regionsVersion.version": region_version,
+              },
+              json=product,
+          )
+          show(patch, "PATCH onetimeproducts")
+          if patch.status_code != 200:
+              raise SystemExit(1)
+
+          # ---------------------------------------------------------------
+          # 5. 활성화. 이걸 빠뜨리면 DRAFT 로 남아 구매가 안 된다.
+          # ---------------------------------------------------------------
+          if ACTIVATE:
+              print("=" * 64)
+              print("구매 옵션 활성화")
+              print("=" * 64)
+              act = session.post(
+                  f"{BASE}/oneTimeProducts/{PRODUCT_ID}/purchaseOptions:batchUpdateStates",
+                  json={
+                      "requests": [
+                          {
+                              "activatePurchaseOptionRequest": {
+                                  "packageName": PKG,
+                                  "productId": PRODUCT_ID,
+                                  "purchaseOptionId": OPTION_ID,
+                              }
+                          }
+                      ]
+                  },
+              )
+              show(act, "batchUpdateStates(activate)")
+              if act.status_code != 200:
+                  raise SystemExit(1)
+          else:
+              print("activate=false 이므로 구매 옵션은 DRAFT 로 남는다. 아직 못 판다.")
+
+          # ---------------------------------------------------------------
+          # 6. 결과 확인
+          # ---------------------------------------------------------------
+          print("=" * 64)
+          print("최종 상태")
+          print("=" * 64)
+          final = session.get(f"{BASE}/oneTimeProducts/{PRODUCT_ID}")
+          print(f"HTTP {final.status_code}")
+          if final.status_code == 200:
+              f = final.json()
+              for po in f.get("purchaseOptions", []):
+                  print(f"  purchaseOption={po.get('purchaseOptionId')} state={po.get('state')} "
+                        f"legacyCompatible={po.get('buyOption', {}).get('legacyCompatible')}")
+                  for cfg in po.get("regionalPricingAndAvailabilityConfigs", []):
+                      if cfg.get("regionCode") == "KR":
+                          print(f"  KR 가격 = {money_str(cfg.get('price'))} ({cfg.get('availability')})")
+              print()
+              print("state 가 ACTIVE 여야 실제로 구매할 수 있다.")
+          else:
+              print(final.text)
+          PY
