@@ -6,14 +6,21 @@ name: Probe Play in-app products
 #   1. 서비스 계정에 인앱 상품 권한이 있는가
 #      -> 필요한 권한은 "스토어 등록정보 관리(Manage store presence)"다.
 #         "주문 및 정기 결제 관리"가 아니다 -- 그건 orders/purchases 용이다.
-#         기존 워크플로들은 출시 권한만 쓰므로 이 권한이 없을 수 있다.
-#   2. 판매자(결제) 프로필이 설정돼 있는가
-#      -> 없으면 인앱 상품 자체를 만들 수 없고, 이는 API 로 해결할 수 없다.
-#   3. 이미 등록된 상품이 있다면 그 판매자 통화
-#      -> defaultPrice 는 정산 통화로 적어야 하므로 이 값이 필요하다.
+#   2. 이미 등록된 상품이 있다면 그 판매자 통화
+#      -> 지역 가격을 적으려면 이 값이 필요하다.
+#
+# 왜 엔드포인트가 둘인가:
+#   레거시 `inappproducts` 는 이 앱에서 403 으로 막혀 있다. 권한 문제가 아니라
+#   본문이 그렇게 말한다 --
+#       { "code": 403, "message": "Please migrate to the new publishing API.",
+#         "status": "PERMISSION_DENIED" }
+#   즉 이 계정은 신규 `monetization.onetimeproducts` API 를 써야 한다.
+#   두 엔드포인트를 모두 때려서 어느 쪽이 살아 있는지 남긴다. 403 은
+#   "권한 없음"과 "이 API 를 쓰지 마라"를 같은 코드로 돌려주므로,
+#   본문을 읽지 않고 코드만 보면 진단이 틀린다.
 #
 # edits 트랜잭션을 쓰지 않는다:
-#   inappproducts 는 edits 밖의 독립 리소스다. 공식 문서 원문 --
+#   inappproducts / onetimeproducts 모두 edits 밖의 독립 리소스다. 공식 문서 원문 --
 #   "Methods for the inappproducts, products, and subscriptions resources
 #    take effect immediately, whether or not there is an open edit."
 #   그래서 play-status.yml 과 달리 edit 을 열 필요가 없고, 열지 않으므로
@@ -51,7 +58,7 @@ jobs:
       - name: Install Google auth library
         run: pip install --quiet google-auth requests
 
-      - name: Probe inappproducts (read-only)
+      - name: Probe in-app products (read-only)
         env:
           SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
           PACKAGE_NAME: com.mycompany.lightonflashlight
@@ -70,51 +77,66 @@ jobs:
           )
           session = google.auth.transport.requests.AuthorizedSession(creds)
 
-          url = f"{BASE}/inappproducts"
-          print(f"GET {url}")
-          print()
-
-          r = session.get(url)
-
-          print("=" * 60)
-          print(f"HTTP {r.status_code}")
-          print("=" * 60)
-          # 판매자 프로필 미설정과 권한 부족을 구분하는 유일한 단서가 본문이다.
-          # 공식 문서에 정확한 메시지가 없으므로 가공하지 말고 원문을 남긴다.
-          print(r.text)
-          print()
-
-          if r.status_code == 200:
-              products = r.json().get("inappproduct", [])
-              print("=" * 60)
-              print(f"권한 OK. 등록된 인앱 상품 {len(products)}개")
-              print("=" * 60)
-              if not products:
-                  print("아직 상품이 없다. 판매자 통화는 이 응답으로 알 수 없으므로")
-                  print("Play Console 의 결제 프로필에서 확인해야 한다.")
-              for p in products:
-                  price = p.get("defaultPrice", {})
-                  print(f"  sku={p.get('sku')} type={p.get('purchaseType')} "
-                        f"status={p.get('status')} "
-                        f"defaultPrice={price.get('priceMicros')} {price.get('currency')}")
-                  print(f"    listings={sorted(p.get('listings', {}).keys())} "
-                        f"defaultLanguage={p.get('defaultLanguage')}")
+          def probe(label, url):
+              print("=" * 64)
+              print(f"{label}")
+              print(f"GET {url}")
+              print("=" * 64)
+              r = session.get(url)
+              print(f"HTTP {r.status_code}")
+              # 판매자 프로필 미설정 / 권한 부족 / API 마이그레이션 요구를
+              # 구분하는 유일한 단서가 본문이다. 가공하지 말고 원문을 남긴다.
+              print(r.text)
               print()
-              print("다음 단계: 상품 등록 워크플로를 만들 수 있다.")
-          elif r.status_code == 401:
-              print("::error::401 - 서비스 계정 키 자체의 문제다.")
-          elif r.status_code == 403:
-              print("::error::403 - 서비스 계정에 인앱 상품 권한이 없다.")
-              print("Play Console -> 사용자 및 권한 -> 해당 서비스 계정에")
-              print("'스토어 등록정보 관리(Manage store presence)' 권한을 준다.")
-              print("(이 권한에 '가격, 인앱 상품, 가격 템플릿 수정'이 포함된다)")
-          elif r.status_code == 400:
-              print("::error::400 - 위 본문을 읽어라.")
-              print("merchant / payments 가 언급되면 판매자(결제) 프로필이 없는 것이다.")
-              print("Play Console -> 설정 -> 결제 프로필에서 생성해야 하며,")
-              print("API 로는 만들 수 없고 검토에 며칠 걸린다.")
-          else:
-              print(f"::error::예상치 못한 상태 코드 {r.status_code}. 위 본문을 읽어라.")
+              return r
 
-          raise SystemExit(0 if r.status_code == 200 else 1)
+          # 신규 API. 이 앱이 실제로 써야 하는 쪽이다.
+          new = probe("신규: monetization.onetimeproducts.list", f"{BASE}/oneTimeProducts")
+
+          # 레거시 API. 기록용으로 남긴다 -- 어느 쪽이 막혔는지가 진단이다.
+          old = probe("레거시: inappproducts.list", f"{BASE}/inappproducts")
+
+          print("=" * 64)
+          print("판정")
+          print("=" * 64)
+
+          if new.status_code == 200:
+              body = new.json()
+              products = body.get("oneTimeProducts", [])
+              print(f"신규 API 권한 OK. 등록된 일회성 상품 {len(products)}개")
+              for p in products:
+                  print(f"  productId={p.get('productId')}")
+                  for lst in p.get("listings", []):
+                      print(f"    listing {lst.get('languageCode')}: {lst.get('title')}")
+                  for po in p.get("purchaseOptions", []):
+                      print(f"    purchaseOption={po.get('purchaseOptionId')} "
+                            f"state={po.get('state')} "
+                            f"legacyCompatible={po.get('buyOption', {}).get('legacyCompatible')}")
+                      for cfg in po.get("regionalPricingAndAvailabilityConfigs", []):
+                          pr = cfg.get("price", {})
+                          print(f"      {cfg.get('regionCode')}: "
+                                f"{pr.get('units')}.{pr.get('nanos', 0):09d} {pr.get('currencyCode')} "
+                                f"({cfg.get('availability')})")
+              if not products:
+                  print("아직 상품이 없다. 다음 단계: 상품 등록 워크플로를 돌린다.")
+              print()
+              print("regionsVersion 은 이 응답으로 알 수 없다. 등록 워크플로가")
+              print("monetization.convertRegionPrices 응답의 regionVersion 을 그대로 쓴다.")
+          elif new.status_code == 401:
+              print("::error::401 - 서비스 계정 키 자체의 문제다.")
+          elif new.status_code == 403:
+              print("::error::403 - 위 본문을 읽어라.")
+              print("'permission' 계열이면 Play Console -> 사용자 및 권한 -> 해당")
+              print("서비스 계정에 '스토어 등록정보 관리(Manage store presence)' 권한을 준다.")
+              print("(이 권한에 '가격, 인앱 상품, 가격 템플릿 수정'이 포함된다)")
+          elif new.status_code == 400:
+              print("::error::400 - 위 본문을 읽어라.")
+              print("merchant / payments 가 언급되면 판매자(결제) 프로필 문제다.")
+          else:
+              print(f"::error::예상치 못한 상태 코드 {new.status_code}. 위 본문을 읽어라.")
+
+          print()
+          print(f"참고: 레거시 inappproducts 는 HTTP {old.status_code}")
+
+          raise SystemExit(0 if new.status_code == 200 else 1)
           PY
