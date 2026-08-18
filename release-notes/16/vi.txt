@@ -1,0 +1,4 @@
+• Đã sửa lỗi khiến đèn pin không bật được trên một số thiết bị.
+• Trên thiết bị không có đèn flash, màn hình sẽ sáng lên để dùng thay cho đèn pin.
+• Đã chuyển phần chọn ngôn ngữ lên phía trên màn hình và sắp xếp lại nút bấm cùng quảng cáo.
+• Màn hình không còn tự tắt trong khi bạn dùng ứng dụng.

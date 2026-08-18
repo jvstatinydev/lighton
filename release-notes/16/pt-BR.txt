@@ -1,0 +1,4 @@
+• Corrigimos um problema que impedia a lanterna de acender em alguns aparelhos.
+• Em aparelhos sem flash, a tela agora acende bastante e pode ser usada no lugar da lanterna.
+• O seletor de idioma foi para o topo da tela e o botão e o anúncio foram reorganizados.
+• A tela não apaga mais sozinha enquanto você usa o app.

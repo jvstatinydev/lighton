@@ -127,6 +127,12 @@ jobs:
       - name: Analyze
         run: flutter analyze --no-fatal-warnings --no-fatal-infos
 
+      # 이 워크플로만 Play 로 올라가므로, 진단 상수가 켜진 채 나가는 것을
+      # 여기서 막는다. 사이드로드용 build-apk.yml 은 조사용 빌드를 만드는
+      # 통로이므로 같은 검사를 걸지 않는다.
+      - name: Test
+        run: flutter test test/torch_util_test.dart test/screen_light_test.dart test/release_guard_test.dart
+
       - name: Build release AAB
         env:
           BUILD_NAME: ${{ inputs.build_name }}
@@ -167,17 +173,55 @@ jobs:
 
       # 출시 노트는 whatsnew-<로케일> 이라는 이름의 파일로 넘겨야 한다.
       # 노트를 비워두면 디렉터리 자체를 만들지 않고, 아래 업로드에서도 생략된다.
+      #
+      # 원문은 레포의 release-notes/<버전 코드>/<로케일>.txt 에 두는 것이 기본이다.
+      # 스토어 등록정보는 여러 언어인데 release_notes 입력은 한 언어밖에 못 받아서,
+      # 입력만 쓰면 한 언어만 채워진 채로 나간다. 디렉터리가 있으면 그것을 쓰고,
+      # 없을 때만 예전처럼 입력 한 줄을 쓴다.
       - name: Prepare release notes
         id: whatsnew
-        if: inputs.track != 'none' && inputs.release_notes != ''
+        if: inputs.track != 'none'
         env:
           RELEASE_NOTES: ${{ inputs.release_notes }}
           LOCALE: ${{ inputs.release_notes_locale }}
+          BUILD_NUMBER: ${{ inputs.build_number }}
         run: |
+          set -euo pipefail
+
+          # 버전 코드는 입력이 우선이고, 비어 있으면 pubspec.yaml 의 version: 뒤 +N 이다.
+          vc="$BUILD_NUMBER"
+          if [ -z "$vc" ]; then
+            vc="$(sed -n 's/^version:.*+\([0-9][0-9]*\).*/\1/p' pubspec.yaml | head -1)"
+          fi
+
+          src="release-notes/$vc"
           dir="$RUNNER_TEMP/whatsnew"
-          mkdir -p "$dir"
-          printf '%s' "$RELEASE_NOTES" > "$dir/whatsnew-$LOCALE"
-          echo "dir=$dir" >> "$GITHUB_OUTPUT"
+
+          if [ -d "$src" ]; then
+            mkdir -p "$dir"
+            n=0
+            for f in "$src"/*.txt; do
+              [ -e "$f" ] || continue
+              locale="$(basename "$f" .txt)"
+              cp "$f" "$dir/whatsnew-$locale"
+              n=$((n + 1))
+            done
+            if [ "$n" -eq 0 ]; then
+              echo "::error::$src 에 .txt 파일이 없습니다."
+              exit 1
+            fi
+            echo "출시 노트 $n개 로케일을 $src 에서 읽었습니다."
+            echo "dir=$dir" >> "$GITHUB_OUTPUT"
+          elif [ -n "$RELEASE_NOTES" ]; then
+            # 디렉터리가 아직 없는 버전. 한 언어만 나가므로 나중에
+            # play-release-notes.yml 로 나머지 언어를 채워야 한다.
+            echo "::warning::$src 가 없어 release_notes 입력($LOCALE) 한 언어만 올립니다."
+            mkdir -p "$dir"
+            printf '%s' "$RELEASE_NOTES" > "$dir/whatsnew-$LOCALE"
+            echo "dir=$dir" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::출시 노트 없이 올립니다 ($src 도 없고 release_notes 도 비어 있음)."
+          fi
 
       # 서드파티 액션이 서비스 계정 키를 다루므로, 태그(v1.1.5)가 아니라 커밋 SHA로 고정한다.
       # 태그는 옮겨질 수 있지만 SHA는 그럴 수 없다.

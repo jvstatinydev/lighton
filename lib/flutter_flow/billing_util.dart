@@ -13,11 +13,13 @@ export 'package:in_app_purchase/in_app_purchase.dart' show ProductDetails;
 
 // "광고 제거" 일회성 결제. 백엔드가 없으므로 권한은 기기에서 Play 에 직접
 // 물어 판정한다. 구조는 admob_util.dart 를 그대로 따랐다 -- 모듈 레벨의
-// 일회성 Future, 절대 예외를 던지지 않음, 그리고 화면에 그릴 수 있는 진단값.
+// 일회성 Future, 절대 예외를 던지지 않음, 그리고 사람이 읽을 수 있는 진단값.
 //
-// adb 를 쓸 수 없어 logcat 을 볼 수 없으므로(CLAUDE.md 의 `adb` 항목),
-// 기기에서 무슨 일이 났는지 읽으려면 billingReadiness 를 위젯 트리에
-// 그리는 방법밖에 없다.
+// billingReadiness 는 두 곳에서 읽을 수 있다. 하나는 아래 debugPrint 로,
+// emulator-check.yml 이 CI 에뮬레이터에서 logcat 을 받아오므로 여기 찍힌
+// 값이 그대로 보인다(런타임 질문은 이쪽을 먼저 본다). 다른 하나는 위젯
+// 트리에 그리는 것으로, 실기기에서만 나는 문제는 그 방법뿐이다 --
+// 로컬에는 adb 가 없다(CLAUDE.md 의 `adb` 항목).
 
 /// Play Console 에 등록한 상품 ID. 등록은 `.github/workflows/play-iap-create.yml`
 /// 이 하고, 그 워크플로의 `PRODUCT_ID` 와 반드시 같아야 한다.

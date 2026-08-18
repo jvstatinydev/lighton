@@ -1,0 +1,4 @@
+• Memperbaiki masalah senter tidak menyala di sebagian perangkat.
+• Pada perangkat tanpa lampu kilat, layar kini menyala terang untuk dipakai sebagai pengganti senter.
+• Pilihan bahasa dipindahkan ke bagian atas layar, dan tata letak tombol serta iklan dirapikan.
+• Layar tidak lagi mati sendiri saat Anda menggunakan aplikasi.

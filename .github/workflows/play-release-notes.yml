@@ -1,0 +1,268 @@
+name: Set Play release notes
+
+# 이미 Play에 올라간 릴리스의 "출시 노트"만 모든 언어로 채운다. AAB를 새로
+# 올리지 않고, 버전 코드·출시 상태·출시 이름·단계적 출시 비율은 그대로 둔다.
+#
+# 쓰임새: build-aab.yml 의 release_notes 입력은 한 언어만 받는다. 그렇게 올린
+# 릴리스에 나머지 언어를 채워 넣거나, 이미 게시된 릴리스의 노트를 고칠 때 쓴다.
+#
+# 노트 원문은 이 워크플로의 입력이 아니라 레포의 `release-notes/<버전 코드>/`
+# 아래에 언어별 파일로 둔다(`ko-KR.txt`, `en-US.txt`, ...). 16개 언어를 입력창에
+# 붙여 넣을 수는 없고, 무엇을 내보냈는지는 코드 리뷰로 남아야 하기 때문이다.
+#
+# 안전 장치
+#   - 기본값은 미리보기(apply=false)다. 무엇이 어떻게 바뀌는지만 출력하고
+#     edits.delete 로 임시 edit 을 지운다. Play Console 에는 아무 영향이 없다.
+#   - apply=true 일 때만 edits.commit 을 호출한다. 이때 confirm 입력에
+#     대상 버전 코드를 정확히 다시 적어야 진행된다(오조작 방지).
+#   - 스토어 등록정보에 없는 로케일이 하나라도 섞이면 API 가 요청 전체를
+#     거절하므로, 보내기 전에 listings 와 대조해서 먼저 멈춘다.
+#   - 노트는 로케일당 500자를 넘을 수 없다. 넘으면 보내기 전에 멈춘다.
+#   - 노트를 뺀 나머지 필드는 API 가 돌려준 값을 그대로 되돌려 보낸다.
+#
+# 필요한 GitHub Secret:
+#   PLAY_SERVICE_ACCOUNT_JSON  build-aab.yml / play-status.yml 과 같은 서비스 계정 키
+
+on:
+  workflow_dispatch:
+    inputs:
+      track:
+        description: "대상 트랙"
+        required: true
+        default: production
+        type: choice
+        options: [production, beta, alpha, internal]
+      version_code:
+        description: "노트를 채울 릴리스의 버전 코드. 예: 16"
+        required: true
+      notes_dir:
+        description: "노트 파일이 있는 디렉터리 (비우면 release-notes/<버전 코드>)"
+        required: false
+        default: ""
+      apply:
+        description: "실제로 반영한다. 비워 두면 미리보기만 한다."
+        required: false
+        default: false
+        type: boolean
+      confirm:
+        description: "apply=true 일 때만 필요. 대상 버전 코드를 그대로 다시 입력."
+        required: false
+        default: ""
+      changes_not_sent_for_review:
+        description: "커밋 시 검토로 보내지 않는다. 보통은 비워 둔다."
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  set-notes:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Check Play service account secret
+        env:
+          SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          if [ -z "$SERVICE_ACCOUNT_JSON" ]; then
+            echo "::error::PLAY_SERVICE_ACCOUNT_JSON 시크릿이 필요합니다."
+            exit 1
+          fi
+
+      - name: Install Google auth library
+        run: pip install --quiet google-auth requests
+
+      - name: Set release notes
+        env:
+          SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          PACKAGE_NAME: com.mycompany.lightonflashlight
+          TRACK: ${{ inputs.track }}
+          VERSION_CODE: ${{ inputs.version_code }}
+          NOTES_DIR: ${{ inputs.notes_dir }}
+          APPLY: ${{ inputs.apply }}
+          CONFIRM: ${{ inputs.confirm }}
+          NO_REVIEW: ${{ inputs.changes_not_sent_for_review }}
+        run: |
+          python3 <<'PY'
+          import json, os, sys
+          from pathlib import Path
+          import google.auth.transport.requests
+          from google.oauth2 import service_account
+
+          PKG = os.environ["PACKAGE_NAME"]
+          BASE = f"https://androidpublisher.googleapis.com/androidpublisher/v3/applications/{PKG}"
+          TRACK = os.environ["TRACK"]
+          APPLY = os.environ["APPLY"].lower() == "true"
+          CONFIRM = os.environ.get("CONFIRM", "").strip()
+          NO_REVIEW = os.environ["NO_REVIEW"].lower() == "true"
+
+          # Play 가 로케일당 허용하는 출시 노트 길이.
+          MAX_CHARS = 500
+
+          try:
+              VC = int(os.environ["VERSION_CODE"].strip())
+          except ValueError:
+              print("::error::version_code 는 정수여야 합니다.")
+              sys.exit(1)
+
+          if APPLY and CONFIRM != str(VC):
+              print(f"::error::apply=true 이면 confirm 에 대상 버전 코드({VC}) 를 "
+                    f"그대로 입력해야 합니다. 받은 값: {CONFIRM!r}")
+              sys.exit(1)
+
+          notes_dir = Path(os.environ.get("NOTES_DIR", "").strip()
+                           or f"release-notes/{VC}")
+          if not notes_dir.is_dir():
+              print(f"::error::노트 디렉터리가 없습니다: {notes_dir}")
+              sys.exit(1)
+
+          # 파일 이름이 곧 로케일이다. release-notes/16/ko-KR.txt -> ko-KR
+          notes = {}
+          for path in sorted(notes_dir.glob("*.txt")):
+              text = path.read_text(encoding="utf-8").strip()
+              if not text:
+                  print(f"::error::{path} 가 비어 있습니다.")
+                  sys.exit(1)
+              if len(text) > MAX_CHARS:
+                  print(f"::error::{path} 가 {len(text)}자입니다. "
+                        f"로케일당 {MAX_CHARS}자를 넘을 수 없습니다.")
+                  sys.exit(1)
+              notes[path.stem] = text
+
+          if not notes:
+              print(f"::error::{notes_dir} 에 .txt 파일이 없습니다.")
+              sys.exit(1)
+
+          print(f"노트 {len(notes)}개 로케일을 읽었습니다: {sorted(notes)}\n")
+
+          creds = service_account.Credentials.from_service_account_info(
+              json.loads(os.environ["SERVICE_ACCOUNT_JSON"]),
+              scopes=["https://www.googleapis.com/auth/androidpublisher"],
+          )
+          session = google.auth.transport.requests.AuthorizedSession(creds)
+
+          def call(method, url, **kw):
+              r = session.request(method, url, **kw)
+              if not r.ok:
+                  print(f"::error::{method} {url.replace(BASE, '')} -> "
+                        f"{r.status_code} {r.text[:400]}")
+                  return None
+              return r.json() if r.text else {}
+
+          edit = call("POST", f"{BASE}/edits")
+          if edit is None:
+              sys.exit(1)
+          edit_id = edit["id"]
+          print(f"임시 edit 생성됨: {edit_id}\n")
+
+          committed = False
+          try:
+              # 등록정보에 없는 로케일이 섞이면 업로드 요청 전체가 거절된다.
+              # 어느 언어가 문제인지 API 오류로는 알기 어려우므로 먼저 대조한다.
+              listings = call("GET", f"{BASE}/edits/{edit_id}/listings")
+              if listings is None:
+                  sys.exit(1)
+              available = {l.get("language") for l in listings.get("listings", [])}
+
+              unknown = sorted(set(notes) - available)
+              if unknown:
+                  print(f"::error::스토어 등록정보에 없는 로케일입니다: {unknown}")
+                  print(f"  등록정보에 있는 로케일: {sorted(available)}")
+                  sys.exit(1)
+
+              missing = sorted(available - set(notes))
+              if missing:
+                  # 막지는 않는다. 새 언어를 등록정보에 추가한 직후처럼
+                  # 번역이 아직 없는 상태가 정상일 수 있다.
+                  print(f"::warning::노트가 없는 등록정보 로케일: {missing}")
+
+              track = call("GET", f"{BASE}/edits/{edit_id}/tracks/{TRACK}")
+              if track is None:
+                  sys.exit(1)
+
+              releases = track.get("releases", [])
+              matches = [r for r in releases if VC in
+                         [int(c) for c in r.get("versionCodes", [])]]
+
+              if len(matches) != 1:
+                  print(f"::error::트랙 '{TRACK}' 에서 버전 코드 {VC} 를 가진 릴리스가 "
+                        f"{len(matches)}개입니다. 정확히 1개여야 진행합니다.")
+                  for r in releases:
+                      print(f"  - name={r.get('name')!r} "
+                            f"status={r.get('status')} codes={r.get('versionCodes')}")
+                  sys.exit(1)
+
+              target = matches[0]
+              before = {n.get("language"): n.get("text")
+                        for n in target.get("releaseNotes", [])}
+
+              print("=" * 60)
+              print("변경 내용")
+              print("=" * 60)
+              print(f"  트랙       : {TRACK}")
+              print(f"  버전 코드  : {VC}")
+              print(f"  출시 이름  : {target.get('name')!r} (변경 없음)")
+              print(f"  출시 상태  : {target.get('status')} (변경 없음)")
+              if "userFraction" in target:
+                  print(f"  단계 비율  : {target['userFraction']} (변경 없음)")
+              print(f"  출시 노트  : {len(before)}개 로케일 -> {len(notes)}개 로케일")
+              print()
+              for lang in sorted(notes):
+                  if lang not in before:
+                      mark = "추가"
+                  elif before[lang] != notes[lang]:
+                      mark = "변경"
+                  else:
+                      mark = "동일"
+                  first = notes[lang].splitlines()[0]
+                  print(f"  [{mark}] {lang}: {first[:60]}")
+              dropped = sorted(set(before) - set(notes))
+              if dropped:
+                  print(f"\n  ::경고:: 이 로케일의 기존 노트가 사라집니다: {dropped}")
+              print()
+
+              if all(before.get(l) == t for l, t in notes.items()) and not dropped:
+                  print("이미 같은 노트입니다. 변경할 것이 없어 종료합니다.")
+                  sys.exit(0)
+
+              # 노트만 갈아 끼우고 나머지 필드는 받은 그대로 되돌려 보낸다.
+              target["releaseNotes"] = [
+                  {"language": lang, "text": notes[lang]} for lang in sorted(notes)
+              ]
+
+              if not APPLY:
+                  print("미리보기 모드입니다 (apply=false). 아무것도 반영하지 않았습니다.")
+                  print("실제로 반영하려면 apply=true 로, confirm 에 "
+                        f"{VC} 를 입력해 다시 실행하세요.")
+                  sys.exit(0)
+
+              patched = call(
+                  "PUT",
+                  f"{BASE}/edits/{edit_id}/tracks/{TRACK}",
+                  json={"track": TRACK, "releases": releases},
+              )
+              if patched is None:
+                  sys.exit(1)
+
+              commit_url = f"{BASE}/edits/{edit_id}:commit"
+              if NO_REVIEW:
+                  commit_url += "?changesNotSentForReview=true"
+              result = call("POST", commit_url)
+              if result is None:
+                  sys.exit(1)
+
+              committed = True
+              print("=" * 60)
+              print(f"반영 완료. 출시 노트가 {len(notes)}개 언어로 채워졌습니다.")
+              print("=" * 60)
+              for r in patched.get("releases", []):
+                  langs = [n.get("language") for n in r.get("releaseNotes", [])]
+                  print(f"  name={r.get('name')!r} status={r.get('status')} "
+                        f"codes={r.get('versionCodes')} notes={sorted(langs)}")
+          finally:
+              # 커밋했다면 edit 은 이미 소비됐다. 그 외에는 반드시 지운다.
+              if not committed:
+                  r = session.request("DELETE", f"{BASE}/edits/{edit_id}")
+                  print(f"\n임시 edit 삭제됨 (HTTP {r.status_code})")
+          PY

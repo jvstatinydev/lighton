@@ -1,0 +1,120 @@
+name: Emulator Visual Check
+
+# 에뮬레이터를 CI 러너 위에 띄워서 앱 화면을 찍고 logcat 을 받아온다.
+#
+# 이게 있는 이유: 이 레포에는 adb 가 없어서 logcat 을 볼 수 없다(CLAUDE.md 의
+# `adb` 항목). 그래서 기기 전용 문제는 에러를 위젯 트리에 그려 넣고 → APK 를
+# 빌드하고 → 폰에 설치하고 → 화면을 눈으로 읽는 경로를 탔다.
+#
+# 에뮬레이터를 러너 *위에서* 돌리면 그 러너에는 adb 가 있다. 즉 스크린샷과
+# logcat 이 그냥 아티팩트로 나온다. lib/flutter_flow/torch_util.dart 와
+# lib/flutter_flow/admob_util.dart 가 이미 debugPrint 로 뱉고 있는 진단 문자열
+# (`Torch:\n...`, `AdMob readiness:\n...`)이 여기서 읽힌다. 화면에 그려서
+# 보려고 만든 것들인데, 읽을 방법이 없었을 뿐이다.
+#
+# 에뮬레이터로 검증되는 것:
+#   - 광고 초기화 순서(ensureAdMobReady → initialize → 배너 요청). 에뮬레이터는
+#     AdMob 자동 테스트 기기라 테스트 광고가 실제로 뜬다. 1.0.4+14 에서 광고를
+#     조용히 죽였던 그 경합이 여기서 드러난다.
+#   - 카메라 선택 정책. API 36 에뮬레이터는 카메라를 하나만 내놓는데 그 id 가
+#     "0" 이 아니라 "1" 이다(후면, 플래시 있음). cameraIdList[0] 을 그대로 쓰던
+#     원래 버그가 재현되는 바로 그 기기 형태라서, selectTorchCamera 의 회귀를
+#     실기기 없이 잡을 수 있다. 토글도 setTorchMode 예외 없이 통과한다.
+#   - SafeArea / edge-to-edge. targetSdk 35+ 라 상태바·제스처바가 실제로 그려진
+#     화면을 봐야 하는데, 골든 테스트로는 안드로이드 크롬이 안 나온다.
+#   - 세로/가로 배너 배치.
+#
+# 검증 안 되는 것: 빛이 실제로 나오는지. setTorchMode 가 성공했다는 것까지만
+# 알 수 있고 발광 여부는 알 수 없다. 그건 여전히 실기기(.claude/skills/samsung-rtl)
+# 몫이고, 이 워크플로는 그 대체가 아니라 보완이다.
+#
+# 게이트가 아니라 진단 도구이므로 수동 실행 전용이다. 에뮬레이터 잡은 부팅까지
+# 10분대라 모든 푸시에 걸면 build-apk.yml 보다 비싸진다.
+
+# 주의: workflow_dispatch 워크플로는 파일이 *기본 브랜치에* 있어야 실행할 수 있다.
+# 이게 main 에 들어가기 전에는 API 든 웹이든 404 가 나므로, 브랜치에서 돌려보려면
+# push 트리거를 임시로 붙였다 떼야 한다. main 에 들어간 뒤에는 ref 를 골라
+# 아무 브랜치에나 dispatch 할 수 있다.
+on:
+  workflow_dispatch:
+    inputs:
+      api-level:
+        description: "에뮬레이터 API 레벨 (실질 minSdk 가 24라 그 아래는 불가)"
+        type: choice
+        default: "36"
+        options:
+          - "36"
+          - "35"
+          - "34"
+          - "30"
+          - "24"
+      settle-seconds:
+        description: "앱 실행 후 화면이 자리잡을 때까지 기다리는 초"
+        type: string
+        default: "25"
+
+jobs:
+  emulator-check:
+    runs-on: ubuntu-latest
+    # push 로 불릴 때는 inputs 가 비어 있다. api-level 은 액션의 필수 입력이라
+    # 비면 잡이 죽으므로 여기서 기본값을 한 번 정해두고 아래에서 이것만 쓴다.
+    env:
+      API_LEVEL: ${{ inputs.api-level || '36' }}
+      SETTLE_SECONDS: ${{ inputs.settle-seconds || '25' }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: "3.44.8" # build-apk.yml 과 같은 버전으로 묶어둔다
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      # 사용자가 받는 것과 같은 릴리스 빌드를 본다. android/key.properties 가
+      # 없으면 디버그 키로 서명되므로(android/app/build.gradle) 설치는 된다.
+      # 디버그 빌드를 쓰지 않는 이유: 화면 우상단에 DEBUG 배너가 그려져서
+      # 비주얼 체크를 방해한다. print/debugPrint 는 릴리스에서도 logcat 으로
+      # 나가므로 진단은 그대로 읽힌다.
+      - name: Build release APK
+        run: flutter build apk --release
+
+      # android-emulator-runner README 가 안내하는 방식. 없으면 에뮬레이터가
+      # 소프트웨어 렌더링으로 떨어져서 훨씬 느려진다.
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run app on emulator and capture
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ env.API_LEVEL }}
+          # google_apis 는 Play services 를 포함한다. AdMob 이 그걸 요구하므로
+          # default 이미지로는 광고 쪽을 아예 볼 수 없다.
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          emulator-boot-timeout: 900
+          disable-animations: true
+          script: bash .github/scripts/emulator-capture.sh "${{ env.SETTLE_SECONDS }}"
+
+      - name: Upload screenshots and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: emulator-check-api${{ env.API_LEVEL }}
+          path: emulator-out/
+          if-no-files-found: error

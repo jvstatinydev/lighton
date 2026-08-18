@@ -1,0 +1,4 @@
+• Risolto un problema per cui la torcia non si accendeva su alcuni dispositivi.
+• Sui dispositivi senza flash lo schermo si illumina e può essere usato al suo posto.
+• Il selettore della lingua è stato spostato in alto e pulsante e annuncio sono stati riorganizzati.
+• Lo schermo non si spegne più da solo mentre usi l'app.
