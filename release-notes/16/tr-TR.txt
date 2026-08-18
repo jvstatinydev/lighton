@@ -1,0 +1,4 @@
+• Bazı cihazlarda fenerin yanmamasına yol açan sorun giderildi.
+• Flaşı olmayan cihazlarda ekran parlak şekilde yanarak fener yerine kullanılabiliyor.
+• Dil seçimi ekranın üst kısmına taşındı; düğme ve reklam yerleşimi düzenlendi.
+• Uygulamayı kullanırken ekran artık kendiliğinden kapanmıyor.

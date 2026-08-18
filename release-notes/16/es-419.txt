@@ -1,0 +1,4 @@
+• Se corrigió un error por el que la linterna no encendía en algunos dispositivos.
+• En los dispositivos sin flash, ahora la pantalla se ilumina para usarla como linterna.
+• El selector de idioma se movió a la parte superior y se reorganizaron el botón y el anuncio.
+• La pantalla ya no se apaga sola mientras usas la aplicación.

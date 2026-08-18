@@ -1,0 +1,4 @@
+• Fehler behoben, durch den die Taschenlampe auf manchen Geräten nicht anging.
+• Auf Geräten ohne Blitz leuchtet nun der Bildschirm hell auf und dient als Ersatz.
+• Die Sprachauswahl sitzt jetzt oben; Schaltfläche und Werbung wurden neu angeordnet.
+• Der Bildschirm schaltet sich während der Nutzung nicht mehr von selbst aus.

@@ -1,0 +1,4 @@
+• Fixed the flashlight not turning on for some devices.
+• On devices with no flash, the screen now lights up brightly so you can use it instead.
+• Moved the language picker to the top of the screen and tidied up the button and ad layout.
+• The screen no longer turns itself off while you are using the app.

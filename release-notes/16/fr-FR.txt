@@ -1,0 +1,4 @@
+• Correction d'un problème qui empêchait la lampe de s'allumer sur certains appareils.
+• Sur les appareils sans flash, l'écran s'illumine désormais pour servir de lampe.
+• Le sélecteur de langue est passé en haut de l'écran ; le bouton et la publicité ont été réorganisés.
+• L'écran ne s'éteint plus tout seul pendant l'utilisation de l'application.
