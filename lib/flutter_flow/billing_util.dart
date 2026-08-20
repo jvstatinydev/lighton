@@ -35,6 +35,15 @@ const int _kRevokeAfterConsecutiveMisses = 3;
 
 const String _kMissCountKey = '__remove_ads_miss_count__';
 
+/// Play 결제 서비스 호출의 상한.
+///
+/// 이 상한이 없으면 결제 서비스가 없는 기기에서 앱이 조용히 멈춘다.
+/// `BillingClientManager` 는 연결이 될 때까지 기다리는데, Play 스토어가
+/// 아예 없으면 그 연결이 영영 안 된다. CI 에뮬레이터에서 실제로 그랬다 --
+/// `isAvailable()` 에서 멈춰 `Billing readiness:` 진단조차 찍히지 않았다.
+/// 그 상태로 사용자가 구매를 누르면 스피너만 계속 돈다.
+const Duration _kBillingTimeout = Duration(seconds: 20);
+
 /// 마지막 결제 동작의 결과. 프로모가 사용자에게 보여줄 문구를 고르는 데 쓴다.
 enum BillingOutcome {
   /// 아직 아무 일도 없었다.
@@ -157,11 +166,19 @@ Future<void> _prepareBilling() async {
       onError: (Object e) => _update(error: '구매 스트림: $e'),
     );
 
-    final available = await InAppPurchase.instance.isAvailable();
+    final bool available = await InAppPurchase.instance
+        .isAvailable()
+        .timeout(_kBillingTimeout, onTimeout: () => false);
     _update(available: available);
 
-    await _loadProduct();
-    await refreshEntitlement();
+    if (available) {
+      await _loadProduct();
+      await refreshEntitlement();
+    } else {
+      // 연결이 안 된 상태에서 상품 조회나 소유 조회를 부르면 같은 연결을
+      // 기다리다 똑같이 멈춘다. 여기서 끝낸다.
+      _update(query: '결제 서비스에 연결할 수 없음');
+    }
   } catch (e) {
     _update(error: '초기화: $e');
   }
@@ -170,8 +187,8 @@ Future<void> _prepareBilling() async {
 
 Future<void> _loadProduct() async {
   try {
-    final ProductDetailsResponse response =
-        await InAppPurchase.instance.queryProductDetails(<String>{kRemoveAdsProductId});
+    final ProductDetailsResponse response = await InAppPurchase.instance
+        .queryProductDetails(<String>{kRemoveAdsProductId}).timeout(_kBillingTimeout);
     final List<ProductDetails> matches = response.productDetails
         .where((ProductDetails p) => p.id == kRemoveAdsProductId)
         .toList();
@@ -219,9 +236,11 @@ Future<void> refreshEntitlement({bool countMisses = true}) async {
     // ignore: invalid_use_of_visible_for_testing_member
     final BillingClientManager manager = platform.billingClientManager;
 
-    final PurchasesResultWrapper result = await manager.runWithClient(
-      (BillingClient client) => client.queryPurchases(ProductType.inapp),
-    );
+    final PurchasesResultWrapper result = await manager
+        .runWithClient(
+          (BillingClient client) => client.queryPurchases(ProductType.inapp),
+        )
+        .timeout(_kBillingTimeout);
 
     // result.responseCode 가 아니다. 그 필드는 항상 ok 로 강제돼 있다.
     final BillingResponse code = result.billingResult.responseCode;
@@ -324,6 +343,15 @@ Future<void> buyRemoveAds() async {
   // 하는 대신, 눌렀을 때 여기서 기다린다. main() 이 이미 시작해 뒀으므로
   // 대개는 즉시 끝나고, 네트워크가 느렸던 경우에만 실제로 기다린다.
   await ensureBillingReady();
+
+  if (!billingReadiness.value.available) {
+    // Play 결제 서비스에 붙지 못한 기기다. 여기서 상품을 다시 조회해봐야
+    // 같은 연결을 기다릴 뿐이므로 곧장 실패로 알린다. 스피너를 20초 더
+    // 돌리는 것보다 낫다.
+    _update(outcome: BillingOutcome.failed, error: '결제 서비스에 연결할 수 없음');
+    return;
+  }
+
   if (billingReadiness.value.product == null) {
     // 시작할 때 조회가 실패했을 수 있다. 한 번 더 해본다.
     await _loadProduct();
