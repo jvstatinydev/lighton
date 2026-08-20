@@ -77,8 +77,8 @@ jobs:
           # 기본 브랜치에 이 파일이 없으면 404 로 막히므로(프로브에서 확인한 그 제약),
           # 실제 생성은 아래 PUSH_APPLY 를 전용 커밋으로 뒤집어서 한다.
           # 뒤집은 커밋의 diff 자체가 "의도적으로 실행했다"는 기록이 된다.
-          PUSH_APPLY: "false"
-          PUSH_CONFIRM: ""
+          PUSH_APPLY: "true"
+          PUSH_CONFIRM: "remove_ads"
           APPLY: ${{ github.event.inputs.apply || '' }}
           CONFIRM: ${{ github.event.inputs.confirm || '' }}
           ACTIVATE: ${{ github.event.inputs.activate || 'true' }}
