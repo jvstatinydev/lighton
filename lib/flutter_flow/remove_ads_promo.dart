@@ -2,33 +2,134 @@ import 'dart:async' show unawaited;
 
 import 'package:flutter/material.dart';
 
+import '../app_state.dart';
 import 'billing_util.dart';
 import 'flutter_flow_theme.dart';
 import 'internationalization.dart';
 
-/// 배너 자리에 그리는 "광고 제거" 제안.
+/// 배너를 오른쪽 정렬했을 때 왼쪽 여백에 버튼을 두려면 최소 이만큼은 있어야 한다.
 ///
-/// 이 앱에는 설정 화면이 없고 앱바도 비어 있어서, 구매와 **구매 복원**으로
-/// 가는 유일한 통로가 여기다. 그래서 프로모 차례일 때뿐 아니라 광고를 끝내
-/// 못 띄웠을 때도 이 위젯을 그린다(flutter_flow_ad_banner.dart 참고).
+/// 배너는 320dp 고정이다(flutter_flow_ad_banner.dart 참고). 화면이 360dp 면
+/// 남는 자리가 40dp 뿐인데, 거기에 버튼을 넣으면 광고와 사실상 붙는다.
+/// 버튼을 노리다 광고를 잘못 누르면 무효 클릭이 되고 반복되면 계정이 정지된다.
+/// 그래서 버튼 48dp + 죽은 공간 8dp 를 확보할 수 있을 때만 여백에 두고,
+/// 좁으면 상단바로 올린다.
+const double kInlineRemoveAdsMinWidth = 320.0 + 48.0 + 8.0;
+
+/// "광고 제거" 진입 버튼. 상단바와 배너 왼쪽 여백에서 같은 위젯을 쓴다.
 ///
-/// 배너 높이 안에 들어가야 하므로 두 줄로 끝낸다. 손전등 버튼 영역을
-/// 밀어내면 안 된다.
-class RemoveAdsPromo extends StatefulWidget {
-  const RemoveAdsPromo({super.key});
+/// 아이콘만 두는 이유는 자리가 없어서다. 무엇을 파는지는 눌렀을 때 열리는
+/// 시트가 설명한다. 대신 툴팁에 같은 문구를 달아 길게 눌러도 알 수 있게 했다.
+class RemoveAdsButton extends StatelessWidget {
+  const RemoveAdsButton({super.key, this.color});
+
+  /// 화면을 조명으로 쓰는 동안에는 배경이 흰색이라 색을 넘겨받아야 한다.
+  final Color? color;
 
   @override
-  State<RemoveAdsPromo> createState() => _RemoveAdsPromoState();
+  Widget build(BuildContext context) {
+    final String label =
+        FFLocalizations.of(context).getTextOr('rmad0001' /* 광고 없이 사용하기 */);
+    return IconButton(
+      onPressed: () => showRemoveAdsSheet(context),
+      icon: const Icon(Icons.block),
+      iconSize: 20.0,
+      color: color ?? FlutterFlowTheme.of(context).secondaryText,
+      tooltip: label,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints.tightFor(width: 48.0, height: 48.0),
+      visualDensity: VisualDensity.compact,
+    );
+  }
 }
 
-class _RemoveAdsPromoState extends State<RemoveAdsPromo> {
+/// 광고가 아직 안 왔거나 끝내 못 띄웠을 때 그 빈자리에 그리는 제안.
+///
+/// 예전에는 로딩 중 배너 자리가 통째로 비어 있었다. 광고 하나 뜨는 데 시간이
+/// 걸리는 동안 화면에 아무것도 없어서, 기다리다 앱을 닫는 일이 실제로 있었다.
+/// 그 순간이야말로 "광고 없이 쓰기"를 제안하기 가장 좋은 때다.
+class RemoveAdsInlinePromo extends StatelessWidget {
+  const RemoveAdsInlinePromo({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final FFLocalizations t = FFLocalizations.of(context);
+    final FlutterFlowTheme theme = FlutterFlowTheme.of(context);
+
+    return ValueListenableBuilder<BillingReadiness>(
+      valueListenable: billingReadiness,
+      builder: (BuildContext context, BillingReadiness state, Widget? child) {
+        // 가격은 반드시 Play 가 내려준 값을 쓴다. 하드코딩은 정책 위반이고
+        // 나라마다 통화도 금액도 다르다. 아직 못 받았으면 그냥 비워 둔다.
+        final String? price = state.product?.price;
+        return Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () => showRemoveAdsSheet(context),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Flexible(
+                    child: Text(
+                      t.getTextOr('rmad0001' /* 광고 없이 사용하기 */),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.bodyMedium.override(
+                        color: theme.primaryText,
+                        letterSpacing: 0.0,
+                      ),
+                    ),
+                  ),
+                  if (price != null) ...[
+                    const SizedBox(width: 8.0),
+                    Text(
+                      price,
+                      style: theme.bodyMedium.override(
+                        color: theme.secondaryText,
+                        letterSpacing: 0.0,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// 구매와 복원을 담은 시트를 연다.
+Future<void> showRemoveAdsSheet(BuildContext context) {
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: FlutterFlowTheme.of(context).secondaryBackground,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16.0)),
+    ),
+    builder: (BuildContext sheetContext) => const _RemoveAdsSheet(),
+  );
+}
+
+class _RemoveAdsSheet extends StatefulWidget {
+  const _RemoveAdsSheet();
+
+  @override
+  State<_RemoveAdsSheet> createState() => _RemoveAdsSheetState();
+}
+
+class _RemoveAdsSheetState extends State<_RemoveAdsSheet> {
   bool _busy = false;
 
   @override
   void initState() {
     super.initState();
-    // main() 이 이미 시작했지만 멱등하다. 프로모가 먼저 그려지는 경우를 대비해
-    // 여기서도 부른다 -- 상품 정보가 없으면 가격을 못 보여주기 때문이다.
+    // main() 이 이미 시작했지만 멱등하다. 상품 정보를 아직 못 받았을 수 있으니
+    // 시트를 열 때 한 번 더 밀어준다.
     unawaited(ensureBillingReady());
   }
 
@@ -42,14 +143,19 @@ class _RemoveAdsPromoState extends State<RemoveAdsPromo> {
     } finally {
       if (mounted) {
         setState(() => _busy = false);
+        // 권한이 생겼으면 시트를 닫는다. 홈 화면이 배너 자리를 통째로
+        // 걷어내므로 시트만 남아 있을 이유가 없다.
+        if (FFAppState().adsRemoved) {
+          Navigator.of(context).pop();
+        }
       }
     }
   }
 
   /// 사용자에게 보여줄 결과 문구. 없으면 null.
   ///
-  /// 성공(purchased/restored)은 여기서 다루지 않는다. 권한이 생기면 홈 화면이
-  /// 이 위젯을 통째로 언마운트하므로 보여줄 자리가 없어진다.
+  /// 성공(purchased/restored)은 여기서 다루지 않는다. 권한이 생기면 시트가
+  /// 닫히므로 보여줄 자리가 없어진다.
   String? _message(BuildContext context, BillingOutcome outcome) {
     final FFLocalizations t = FFLocalizations.of(context);
     return switch (outcome) {
@@ -72,96 +178,91 @@ class _RemoveAdsPromoState extends State<RemoveAdsPromo> {
     final FFLocalizations t = FFLocalizations.of(context);
     final FlutterFlowTheme theme = FlutterFlowTheme.of(context);
 
-    return ValueListenableBuilder<BillingReadiness>(
-      valueListenable: billingReadiness,
-      builder: (BuildContext context, BillingReadiness state, Widget? child) {
-        final ProductDetails? product = state.product;
-        // 가격은 반드시 Play 가 내려준 값을 쓴다. 하드코딩은 정책 위반이고,
-        // 나라마다 통화도 금액도 다르다.
-        final String? price = product?.price;
-        final bool canBuy = product != null && !_busy;
-        final String? message = _message(context, state.outcome);
+    return SafeArea(
+      child: ValueListenableBuilder<BillingReadiness>(
+        valueListenable: billingReadiness,
+        builder: (BuildContext context, BillingReadiness state, Widget? child) {
+          final ProductDetails? product = state.product;
+          final String? message = _message(context, state.outcome);
+          // 상품 정보를 아직 못 받았어도 버튼은 살려 둔다. 눌렀을 때
+          // buyRemoveAds() 가 준비를 기다렸다가 진행한다. 회색 버튼을 두고
+          // 언제 켜지나 지켜보게 하는 것보다 낫다.
+          final bool waiting = product == null;
 
-        return Container(
-          width: double.infinity,
-          color: theme.primaryBackground,
-          padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      t.getTextOr('rmad0001' /* 광고 없이 사용하기 */),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.bodyMedium.override(
-                        color: theme.primaryText,
-                        letterSpacing: 0.0,
-                      ),
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(24.0, 20.0, 24.0, 16.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  t.getTextOr('rmad0001' /* 광고 없이 사용하기 */),
+                  textAlign: TextAlign.center,
+                  style: theme.headlineSmall.override(
+                    color: theme.primaryText,
+                    letterSpacing: 0.0,
+                  ),
+                ),
+                const SizedBox(height: 8.0),
+                Text(
+                  t.getTextOr('rmad0007' /* 한 번만 구매하면 광고가 영구히 사라집니다. */),
+                  textAlign: TextAlign.center,
+                  style: theme.bodyMedium.override(
+                    color: theme.secondaryText,
+                    letterSpacing: 0.0,
+                  ),
+                ),
+                const SizedBox(height: 20.0),
+                FilledButton(
+                  onPressed: _busy ? null : () => _run(buyRemoveAds),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF38B6A8),
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size.fromHeight(48.0),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8.0),
                     ),
                   ),
-                  if (price != null) ...[
-                    Text(
-                      price,
-                      style: theme.bodyMedium.override(
-                        color: theme.secondaryText,
-                        letterSpacing: 0.0,
-                      ),
-                    ),
-                    const SizedBox(width: 8.0),
-                  ],
-                  TextButton(
-                    onPressed: canBuy ? () => _run(buyRemoveAds) : null,
-                    style: TextButton.styleFrom(
-                      backgroundColor: const Color(0xFF38B6A8),
-                      foregroundColor: Colors.white,
-                      disabledForegroundColor: Colors.white70,
-                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                      minimumSize: const Size(0.0, 32.0),
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(6.0),
-                      ),
-                    ),
-                    child: Text(t.getTextOr('rmad0002' /* 구매 */)),
+                  child: _busy
+                      ? const SizedBox(
+                          width: 20.0,
+                          height: 20.0,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.0,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Text(
+                          waiting
+                              ? t.getTextOr('rmad0002' /* 구매 */)
+                              : '${t.getTextOr('rmad0002' /* 구매 */)}  ${product.price}',
+                        ),
+                ),
+                const SizedBox(height: 4.0),
+                TextButton(
+                  onPressed: _busy ? null : () => _run(restoreRemoveAds),
+                  style: TextButton.styleFrom(
+                    foregroundColor: theme.secondaryText,
+                    minimumSize: const Size.fromHeight(44.0),
                   ),
-                ],
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Text(
-                      message ?? '',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.bodySmall.override(
-                        color: theme.secondaryText,
-                        letterSpacing: 0.0,
-                      ),
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: _busy ? null : () => _run(restoreRemoveAds),
-                    style: TextButton.styleFrom(
-                      foregroundColor: theme.secondaryText,
-                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                      minimumSize: const Size(0.0, 28.0),
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    child: Text(
-                      t.getTextOr('rmad0003' /* 구매 복원 */),
-                      style: theme.bodySmall.override(letterSpacing: 0.0),
+                  child: Text(t.getTextOr('rmad0003' /* 구매 복원 */)),
+                ),
+                if (message != null) ...[
+                  const SizedBox(height: 4.0),
+                  Text(
+                    message,
+                    textAlign: TextAlign.center,
+                    style: theme.bodySmall.override(
+                      color: theme.secondaryText,
+                      letterSpacing: 0.0,
                     ),
                   ),
                 ],
-              ),
-            ],
-          ),
-        );
-      },
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 }

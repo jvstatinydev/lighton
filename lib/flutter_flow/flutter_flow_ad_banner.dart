@@ -5,42 +5,9 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-
 import 'admob_util.dart' show adMobReadiness, ensureAdMobReady;
-import 'remove_ads_promo.dart' show RemoveAdsPromo;
-
-/// 몇 번에 한 번 배너 대신 "광고 제거" 프로모를 띄울지.
-///
-/// 프로모가 뜨는 실행에서는 광고를 **아예 요청하지 않는다.** 이미 로드된
-/// 광고를 다른 것으로 가리면 AdMob 정책 위반이므로, 요청 전에 정해야 한다.
-/// 그만큼 광고 노출을 포기하는 것이고, 5면 20%다.
-const int _kPromoEveryNLaunches = 5;
-
-const String _kLaunchCountKey = '__banner_launch_count__';
-
-/// 이번 실행이 프로모 차례인지. 프로세스당 한 번만 정한다.
-///
-/// 위젯의 initState 가 아니라 여기서 세는 이유는, 언어를 바꾸면 라우터가
-/// 페이지를 다시 만들어 initState 가 한 실행 안에서 여러 번 돌 수 있기
-/// 때문이다. 그러면 "실행 횟수"가 아니라 "위젯 생성 횟수"를 세게 된다.
-bool? _promoSessionDecision;
-
-Future<bool> _isPromoSession() async {
-  final bool? decided = _promoSessionDecision;
-  if (decided != null) {
-    return decided;
-  }
-  try {
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
-    final int count = (prefs.getInt(_kLaunchCountKey) ?? 0) + 1;
-    await prefs.setInt(_kLaunchCountKey, count);
-    return _promoSessionDecision = count % _kPromoEveryNLaunches == 0;
-  } catch (_) {
-    // 저장소를 못 읽으면 광고를 띄우는 쪽으로 넘어간다.
-    return _promoSessionDecision = false;
-  }
-}
+import 'remove_ads_promo.dart'
+    show RemoveAdsButton, RemoveAdsInlinePromo, kInlineRemoveAdsMinWidth;
 
 /// 배너가 광고를 못 띄웠을 때 그 이유를 배너 자리에 글자로 그릴지 여부.
 ///
@@ -60,6 +27,7 @@ class FlutterFlowAdBanner extends StatefulWidget {
     this.iOSAdUnitID,
     this.androidAdUnitID,
     this.hideAd = false,
+    this.showInlineButton = true,
   }) : super(key: key);
 
   final double? width;
@@ -78,6 +46,12 @@ class FlutterFlowAdBanner extends StatefulWidget {
   /// 않는다. 로드된 배너는 그대로 두어 다시 켤 때 즉시 나타난다.
   final bool hideAd;
 
+  /// 배너 왼쪽 여백에 "광고 제거" 버튼을 둘지.
+  ///
+  /// 자리가 모자라면 이 값이 true 여도 그리지 않는다. 그때는 홈 화면이
+  /// 같은 버튼을 상단바에 올린다.
+  final bool showInlineButton;
+
   @override
   _FlutterFlowAdBannerState createState() => _FlutterFlowAdBannerState();
 }
@@ -94,12 +68,6 @@ class _FlutterFlowAdBannerState extends State<FlutterFlowAdBanner> {
   /// 화면에 그릴 실패 사유. null 이면 아직 진행 중이라는 뜻이다.
   String? _failure;
 
-  /// 이번 실행은 광고 대신 프로모를 띄우는 차례다.
-  bool _promoSession = false;
-
-  /// 재시도까지 다 쓰고 광고를 포기했다. 이 자리를 비워두느니 프로모를 그린다.
-  bool _gaveUp = false;
-
   int _attempt = 0;
   bool _loading = false;
   Timer? _retryTimer;
@@ -108,17 +76,8 @@ class _FlutterFlowAdBannerState extends State<FlutterFlowAdBanner> {
   void initState() {
     super.initState();
 
-    SchedulerBinding.instance.addPostFrameCallback((_) async {
-      if (await _isPromoSession()) {
-        if (mounted) {
-          setState(() => _promoSession = true);
-        }
-        // 광고를 요청하지 않는다. 로드해놓고 가리면 정책 위반이다.
-        return;
-      }
-      if (mounted) {
-        await _load();
-      }
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      _load();
     });
   }
 
@@ -226,43 +185,69 @@ class _FlutterFlowAdBannerState extends State<FlutterFlowAdBanner> {
     if (!mounted) {
       return;
     }
-    setState(() {
-      _failure = reason;
-      _gaveUp = true;
-    });
+    // 광고를 포기했다는 사실은 따로 들고 있지 않아도 된다. 배너가 없으면
+    // 그 자리에 프로모가 나오는데, 로딩 중이든 최종 실패든 마찬가지다.
+    setState(() => _failure = reason);
   }
 
   @override
   Widget build(BuildContext context) {
-    final banner = _banner;
-    final adWidget = _adWidget;
-    if (banner != null && adWidget != null) {
+    if (kShowAdBannerDiagnostics) {
+      return _diagnostics();
+    }
+
+    // 화면을 조명으로 쓰는 동안에는 자리만 남기고 아무것도 그리지 않는다.
+    // 글자든 버튼이든 흰 화면에 얹으면 빛을 깎아먹고, 화면을 등지고 비추는
+    // 상황이라 볼 사람도 없다. 조명을 끄면 다시 나온다.
+    if (widget.hideAd) {
       return Container(
-        alignment: Alignment.center,
-        width: banner.size.width.toDouble(),
-        height: banner.size.height.toDouble(),
-        // 감출 때는 같은 크기의 흰 자리로 남긴다. 크기가 그대로라 레이아웃이
-        // 움직이지 않고, 조명 중에는 배경과 같은 흰색이라 눈에 띄지도 않는다.
-        color: widget.hideAd ? Colors.white : null,
-        child: widget.hideAd ? null : adWidget,
+        width: double.infinity,
+        height: AdSize.banner.height.toDouble(),
+        color: Colors.white,
       );
     }
 
-    if (!kShowAdBannerDiagnostics) {
-      // 프로모 차례이거나, 광고를 끝내 못 띄웠을 때. 후자는 예전에는 그냥
-      // 빈 공간으로 접혔는데, 어차피 광고가 없는 자리이므로 잃을 것이 없다.
-      // 그리고 이 두 경우가 사용자가 "구매 복원"에 닿을 수 있는 통로다.
-      //
-      // hideAd 일 때는 그리지 않는다. 그때는 화면을 조명으로 쓰는 중이라
-      // 흰 화면에 글자를 얹으면 빛을 깎아먹고, 화면을 등지고 비추는 상황이라
-      // 읽을 사람도 없다. 조명을 끄면 다시 나온다.
-      if ((_promoSession || _gaveUp) && !widget.hideAd) {
-        return const RemoveAdsPromo();
-      }
-      // 아직 로딩 중이면 자리를 차지하지 않는다.
-      return const SizedBox.shrink();
-    }
+    final banner = _banner;
+    final adWidget = _adWidget;
 
+    // 높이는 광고가 있든 없든 같다. 광고가 늦게 도착해도 화면이 출렁이지 않는다.
+    return SizedBox(
+      height: AdSize.banner.height.toDouble(),
+      child: LayoutBuilder(
+        builder: (BuildContext context, BoxConstraints constraints) {
+          final bool roomForButton =
+              widget.showInlineButton && constraints.maxWidth >= kInlineRemoveAdsMinWidth;
+
+          final Widget slot = banner != null && adWidget != null
+              ? SizedBox(
+                  width: banner.size.width.toDouble(),
+                  height: banner.size.height.toDouble(),
+                  child: adWidget,
+                )
+              // 광고가 아직 안 왔거나 끝내 실패했다. 예전에는 이 자리가 통째로
+              // 비어 있었는데, 광고 하나 뜨는 데 걸리는 그 시간 동안 화면에
+              // 아무것도 없어서 기다리다 앱을 닫는 일이 실제로 있었다.
+              // 그 순간이 "광고 없이 쓰기"를 제안하기 가장 좋은 때다.
+              : const Expanded(child: RemoveAdsInlinePromo());
+
+          return Row(
+            children: [
+              if (roomForButton) ...[
+                const RemoveAdsButton(),
+                // 버튼과 광고 사이의 죽은 공간. 버튼을 노리다 광고를 잘못
+                // 누르면 무효 클릭이 되므로 반드시 띄워 둔다.
+                const SizedBox(width: 8.0),
+              ],
+              if (banner != null && adWidget != null) const Spacer(),
+              slot,
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _diagnostics() {
     return Container(
       color: Colors.black,
       alignment: Alignment.center,

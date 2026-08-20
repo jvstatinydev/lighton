@@ -320,6 +320,15 @@ Future<void> _handlePurchase(PurchaseDetails details) async {
 
 /// 구매 흐름을 띄운다. 결과는 [billingReadiness] 로 온다.
 Future<void> buyRemoveAds() async {
+  // 상품 정보를 아직 못 받았을 수 있다. 회색 버튼을 두고 언제 켜지나 지켜보게
+  // 하는 대신, 눌렀을 때 여기서 기다린다. main() 이 이미 시작해 뒀으므로
+  // 대개는 즉시 끝나고, 네트워크가 느렸던 경우에만 실제로 기다린다.
+  await ensureBillingReady();
+  if (billingReadiness.value.product == null) {
+    // 시작할 때 조회가 실패했을 수 있다. 한 번 더 해본다.
+    await _loadProduct();
+  }
+
   final ProductDetails? product = billingReadiness.value.product;
   if (product == null) {
     _update(outcome: BillingOutcome.failed, error: '상품 정보 없음');

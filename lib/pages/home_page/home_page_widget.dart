@@ -4,6 +4,8 @@ import '/flutter_flow/flutter_flow_language_selector.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
+import '/flutter_flow/remove_ads_promo.dart'
+    show RemoveAdsButton, kInlineRemoveAdsMinWidth;
 import '/flutter_flow/screen_light_notice.dart'
     show showScreenLightNoticeOnce;
 import '/flutter_flow/screen_light_util.dart' show setKeepAwake;
@@ -166,6 +168,11 @@ class _HomePageWidgetState extends State<HomePageWidget>
     // 빛을 내는 것이 목적이므로 색이 있는 영역은 그만큼 빛을 깎아먹는다.
     final screenLit = usesScreenLight && FFAppState().isFlashOn;
 
+    // "광고 제거" 버튼을 배너 옆에 둘 수 있는 폭인지. 배너와 같은 기준을
+    // 쓰므로 둘 중 한 곳에는 반드시 나온다 -- 어느 기기에서도 사라지지 않는다.
+    final roomForInlineButton =
+        MediaQuery.sizeOf(context).width >= kInlineRemoveAdsMinWidth;
+
     return Opacity(
       // 화면을 조명으로 쓰는 동안에는 빛을 깎지 않는다.
       opacity: screenLit ? 1.0 : 0.9,
@@ -208,6 +215,16 @@ class _HomePageWidgetState extends State<HomePageWidget>
                   ),
             ),
             actions: [
+              // 배너 왼쪽 여백이 좁아 거기에 버튼을 둘 수 없는 기기에서만
+              // 상단바로 올린다. 배너는 320dp 고정이라 360dp 화면에서는
+              // 남는 자리가 40dp 뿐이고, 거기에 버튼을 넣으면 광고와 붙어서
+              // 무효 클릭 위험이 생긴다.
+              if (!FFAppState().adsRemoved && !roomForInlineButton)
+                RemoveAdsButton(
+                  color: screenLit
+                      ? Colors.black
+                      : FlutterFlowTheme.of(context).secondaryText,
+                ),
               // 언어 선택기는 원래 본문에 한 줄을 따로 차지하고 있었다.
               // 상단바로 올리면 세로 한 단이 통째로 비어서, 글꼴을 크게 키운
               // 사용자에게 안내 문구가 잘리는 것도 그만큼 덜해진다.
@@ -422,6 +439,7 @@ class _HomePageWidgetState extends State<HomePageWidget>
                     showsTestAd: false,
                     androidAdUnitID: 'ca-app-pub-3228085068090706/4930787659',
                     hideAd: screenLit,
+                    showInlineButton: roomForInlineButton,
                   ),
               ],
             ),
