@@ -31,16 +31,12 @@ name: Probe Play in-app products
 # 필요한 GitHub Secret:
 #   PLAY_SERVICE_ACCOUNT_JSON  다른 Play 워크플로가 쓰는 것과 같은 키
 
-# GitHub 은 workflow_dispatch 를 "기본 브랜치에 있는 워크플로"만 디스패치한다.
-# 이 파일은 아직 main 에 없어서 수동 실행이 404 로 막힌다. 프로브 하나를 돌리려고
-# main 을 건드릴 이유는 없으므로, push 트리거로 이 브랜치에서 직접 돌린다.
-# GET 만 하는 20초짜리라 매 푸시마다 돌아도 무해하다.
-# 프로브가 답을 준 뒤에는 아래 push: 블록을 지운다.
+# 이 파일이 main 에 올라가기 전까지는 workflow_dispatch 가 404 로 막힌다
+# (GitHub 은 기본 브랜치에 있는 워크플로만 디스패치한다). 그동안은 push 트리거를
+# 임시로 달아 이 브랜치에서 돌렸고, 목적을 다한 뒤 지웠다. 다시 돌려야 하는데
+# 아직 main 에 없다면 같은 방법을 쓴다.
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - claude/payment-feature-zzrlaz
 
 jobs:
   probe:

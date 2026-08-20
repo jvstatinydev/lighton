@@ -48,9 +48,6 @@ on:
         description: "생성 후 구매 옵션을 활성화할지. false 면 DRAFT 로 남는다."
         required: false
         default: "true"
-  push:
-    branches:
-      - claude/payment-feature-zzrlaz
 
 jobs:
   create:
@@ -73,12 +70,14 @@ jobs:
           SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
           PACKAGE_NAME: com.mycompany.lightonflashlight
           PRICE_KRW: ${{ github.event.inputs.price_krw || '2500' }}
-          # push 로 도는 실행은 언제나 미리보기다. workflow_dispatch 는 이 저장소의
-          # 기본 브랜치에 이 파일이 없으면 404 로 막히므로(프로브에서 확인한 그 제약),
-          # 실제 생성은 아래 PUSH_APPLY 를 전용 커밋으로 뒤집어서 한다.
-          # 뒤집은 커밋의 diff 자체가 "의도적으로 실행했다"는 기록이 된다.
-          PUSH_APPLY: "true"
-          PUSH_CONFIRM: "remove_ads"
+          # 이 파일이 main 에 없는 동안에는 workflow_dispatch 가 404 로 막힌다.
+          # 그때는 push 트리거를 임시로 달고 아래 두 값을 전용 커밋으로 뒤집어서
+          # 실행한다 -- 뒤집은 커밋의 diff 자체가 "의도적으로 실행했다"는 기록이
+          # 된다. remove_ads 는 그렇게 만들었다(state=ACTIVE, KR 2,500원).
+          # main 에 올라간 뒤에는 workflow_dispatch 입력을 쓰면 되고,
+          # 이 두 값은 그대로 두면 된다.
+          PUSH_APPLY: "false"
+          PUSH_CONFIRM: ""
           APPLY: ${{ github.event.inputs.apply || '' }}
           CONFIRM: ${{ github.event.inputs.confirm || '' }}
           ACTIVATE: ${{ github.event.inputs.activate || 'true' }}
