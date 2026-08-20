@@ -181,12 +181,42 @@ class _RemoveAdsSheet extends StatefulWidget {
 class _RemoveAdsSheetState extends State<_RemoveAdsSheet> {
   bool _busy = false;
 
+  /// 성공을 확인하고 닫는 중. 두 번 닫지 않도록 하는 빗장이다.
+  bool _closing = false;
+
   @override
   void initState() {
     super.initState();
     // main() 이 이미 시작했지만 멱등하다. 상품 정보를 아직 못 받았을 수 있으니
     // 시트를 열 때 한 번 더 밀어준다.
     unawaited(ensureBillingReady());
+
+    // buyRemoveAds() 는 결제창을 **띄운** 시점에 끝난다. 실제 결과는 그 뒤에
+    // purchaseStream 으로 들어온다. 그래서 구매를 누른 함수가 반환됐다고
+    // 시트를 닫으면 안 되고, 반대로 아무 반응도 안 하면 결제가 끝났는데도
+    // 시트가 그대로 떠 있어 실패한 것처럼 보인다. 실제로 그런 지적을 받았다.
+    // 권한이 생기는 순간을 여기서 듣는다.
+    billingReadiness.addListener(_onBillingChanged);
+  }
+
+  @override
+  void dispose() {
+    billingReadiness.removeListener(_onBillingChanged);
+    super.dispose();
+  }
+
+  void _onBillingChanged() {
+    if (!mounted || _closing || !FFAppState().adsRemoved) {
+      return;
+    }
+    _closing = true;
+    // 곧장 닫지 않는다. 성공했다는 것을 눈으로 확인할 시간을 준다.
+    setState(() {});
+    Future<void>.delayed(const Duration(milliseconds: 1600), () {
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+    });
   }
 
   Future<void> _run(Future<void> Function() action) async {
@@ -199,13 +229,11 @@ class _RemoveAdsSheetState extends State<_RemoveAdsSheet> {
     } finally {
       if (mounted) {
         setState(() => _busy = false);
-        // 권한이 생겼으면 시트를 닫는다. 홈 화면이 배너 자리를 통째로
-        // 걷어내므로 시트만 남아 있을 이유가 없다.
-        if (FFAppState().adsRemoved) {
-          Navigator.of(context).pop();
-        }
       }
     }
+    // 여기서 시트를 닫지 않는다. 구매의 경우 이 시점은 결제창을 띄운
+    // 직후일 뿐이고 결과는 아직 오지 않았다. 닫는 것은 _onBillingChanged 가
+    // 권한을 확인한 뒤에 한다.
   }
 
   /// 사용자에게 보여줄 결과 문구. 없으면 null.
@@ -229,6 +257,36 @@ class _RemoveAdsSheetState extends State<_RemoveAdsSheet> {
     };
   }
 
+  /// 결제가 끝난 뒤 잠깐 보여주는 화면.
+  ///
+  /// 이게 없으면 결제를 마치고 돌아왔을 때 시트가 그대로 떠 있어서, 아직
+  /// 결제가 안 된 것처럼 보인다.
+  Widget _success(BuildContext context) {
+    final FlutterFlowTheme theme = FlutterFlowTheme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24.0, 32.0, 24.0, 40.0),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.check_circle,
+            size: 48.0,
+            color: const Color(0xFF38B6A8),
+          ),
+          const SizedBox(height: 12.0),
+          Text(
+            FFLocalizations.of(context).getTextOr('rmad0009' /* 광고가 제거되었습니다 */),
+            textAlign: TextAlign.center,
+            style: theme.headlineSmall.override(
+              color: theme.primaryText,
+              letterSpacing: 0.0,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final FFLocalizations t = FFLocalizations.of(context);
@@ -238,6 +296,10 @@ class _RemoveAdsSheetState extends State<_RemoveAdsSheet> {
       child: ValueListenableBuilder<BillingReadiness>(
         valueListenable: billingReadiness,
         builder: (BuildContext context, BillingReadiness state, Widget? child) {
+          if (FFAppState().adsRemoved) {
+            return _success(context);
+          }
+
           final ProductDetails? product = state.product;
           final String? message = _message(context, state.outcome);
           // 상품 정보를 아직 못 받았어도 버튼은 살려 둔다. 눌렀을 때
