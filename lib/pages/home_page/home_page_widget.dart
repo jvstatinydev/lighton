@@ -221,6 +221,10 @@ class _HomePageWidgetState extends State<HomePageWidget>
               // 무효 클릭 위험이 생긴다.
               if (!FFAppState().adsRemoved && !roomForInlineButton)
                 RemoveAdsButton(
+                  // 상단바에서는 언제나 글자를 보여준다. 아이콘만 있으면
+                  // 무엇을 하는 버튼인지 알 수 없고, 여기는 배너 옆 여백과
+                  // 달리 폭이 광고 크기에 묶여 있지 않다.
+                  showLabel: true,
                   color: screenLit
                       ? Colors.black
                       : FlutterFlowTheme.of(context).secondaryText,

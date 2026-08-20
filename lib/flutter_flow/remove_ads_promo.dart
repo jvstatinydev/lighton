@@ -16,29 +16,81 @@ import 'internationalization.dart';
 /// 좁으면 상단바로 올린다.
 const double kInlineRemoveAdsMinWidth = 320.0 + 48.0 + 8.0;
 
+/// 여백에 아이콘 대신 글자를 넣으려면 이만큼은 있어야 한다.
+///
+/// 아이콘만 있으면 무엇을 하는 버튼인지 알 수 없다는 지적을 받았다. 맞는
+/// 말이라 자리가 되면 글자를 보여준다. 다만 아이콘과 글자를 **함께** 넣을
+/// 자리는 없다 -- 411dp 화면이라도 여백이 91dp 뿐이라, 아이콘까지 넣으면
+/// 글자가 잘린다. 그래서 글자를 보여줄 때는 아이콘을 뺀다. 뜻을 전하는 쪽은
+/// 글자다. 320 + 버튼 56 + 죽은 공간 8.
+const double kLabeledRemoveAdsMinWidth = 320.0 + 56.0 + 8.0;
+
 /// "광고 제거" 진입 버튼. 상단바와 배너 왼쪽 여백에서 같은 위젯을 쓴다.
 ///
-/// 아이콘만 두는 이유는 자리가 없어서다. 무엇을 파는지는 눌렀을 때 열리는
-/// 시트가 설명한다. 대신 툴팁에 같은 문구를 달아 길게 눌러도 알 수 있게 했다.
+/// 무엇을 파는지 자세한 설명은 눌렀을 때 열리는 시트가 한다. 여기서는 자리가
+/// 되면 짧은 라벨을, 안 되면 아이콘만 보여준다. 아이콘만인 경우에도 툴팁과
+/// 스크린 리더용 라벨은 붙여 둔다.
 class RemoveAdsButton extends StatelessWidget {
-  const RemoveAdsButton({super.key, this.color});
+  const RemoveAdsButton({
+    super.key,
+    this.color,
+    this.showLabel = false,
+    this.maxLabelWidth = 88.0,
+  });
 
   /// 화면을 조명으로 쓰는 동안에는 배경이 흰색이라 색을 넘겨받아야 한다.
   final Color? color;
 
+  /// 아이콘 대신 짧은 라벨을 그릴지.
+  final bool showLabel;
+
+  /// 라벨이 차지할 수 있는 최대 폭.
+  ///
+  /// 언어마다 길이가 크게 다르다. 상한이 없으면 독일어처럼 긴 번역이 상단바를
+  /// 밀어내거나 광고를 침범한다. 넘치면 말줄임표 대신 흐리게 흘린다.
+  final double maxLabelWidth;
+
   @override
   Widget build(BuildContext context) {
-    final String label =
-        FFLocalizations.of(context).getTextOr('rmad0001' /* 광고 없이 사용하기 */);
-    return IconButton(
+    final FFLocalizations t = FFLocalizations.of(context);
+    final String label = t.getTextOr('rmad0008' /* 광고 제거 */);
+    final Color fg = color ?? FlutterFlowTheme.of(context).secondaryText;
+
+    if (!showLabel) {
+      return IconButton(
+        onPressed: () => showRemoveAdsSheet(context),
+        icon: const Icon(Icons.block),
+        iconSize: 20.0,
+        color: fg,
+        tooltip: label,
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints.tightFor(width: 48.0, height: 48.0),
+        visualDensity: VisualDensity.compact,
+      );
+    }
+
+    return TextButton(
       onPressed: () => showRemoveAdsSheet(context),
-      icon: const Icon(Icons.block),
-      iconSize: 20.0,
-      color: color ?? FlutterFlowTheme.of(context).secondaryText,
-      tooltip: label,
-      padding: EdgeInsets.zero,
-      constraints: const BoxConstraints.tightFor(width: 48.0, height: 48.0),
-      visualDensity: VisualDensity.compact,
+      style: TextButton.styleFrom(
+        foregroundColor: fg,
+        padding: const EdgeInsetsDirectional.fromSTEB(8.0, 0.0, 8.0, 0.0),
+        minimumSize: const Size(0.0, 40.0),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        visualDensity: VisualDensity.compact,
+      ),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxLabelWidth),
+        child: Text(
+          label,
+          maxLines: 1,
+          softWrap: false,
+          overflow: TextOverflow.fade,
+          style: FlutterFlowTheme.of(context).bodySmall.override(
+                color: fg,
+                letterSpacing: 0.0,
+              ),
+        ),
+      ),
     );
   }
 }

@@ -7,7 +7,11 @@ import 'package:flutter/scheduler.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'admob_util.dart' show adMobReadiness, ensureAdMobReady;
 import 'remove_ads_promo.dart'
-    show RemoveAdsButton, RemoveAdsInlinePromo, kInlineRemoveAdsMinWidth;
+    show
+        RemoveAdsButton,
+        RemoveAdsInlinePromo,
+        kInlineRemoveAdsMinWidth,
+        kLabeledRemoveAdsMinWidth;
 
 /// 배너가 광고를 못 띄웠을 때 그 이유를 배너 자리에 글자로 그릴지 여부.
 ///
@@ -217,6 +221,10 @@ class _FlutterFlowAdBannerState extends State<FlutterFlowAdBanner> {
         builder: (BuildContext context, BoxConstraints constraints) {
           final bool roomForButton =
               widget.showInlineButton && constraints.maxWidth >= kInlineRemoveAdsMinWidth;
+          // 자리가 넉넉하면 글자까지 보여준다. 아이콘만으로는 무엇을 하는
+          // 버튼인지 알 수 없다.
+          final bool roomForLabel =
+              constraints.maxWidth >= kLabeledRemoveAdsMinWidth;
 
           final Widget slot = banner != null && adWidget != null
               ? SizedBox(
@@ -233,7 +241,12 @@ class _FlutterFlowAdBannerState extends State<FlutterFlowAdBanner> {
           return Row(
             children: [
               if (roomForButton) ...[
-                const RemoveAdsButton(),
+                RemoveAdsButton(
+                  showLabel: roomForLabel,
+                  // 남는 자리에서 죽은 공간 8 과 버튼 좌우 여백 16 을 뺀 만큼.
+                  // 이보다 긴 번역은 흐리게 흘려서 광고를 침범하지 않게 한다.
+                  maxLabelWidth: constraints.maxWidth - 320.0 - 8.0 - 16.0,
+                ),
                 // 버튼과 광고 사이의 죽은 공간. 버튼을 노리다 광고를 잘못
                 // 누르면 무효 클릭이 되므로 반드시 띄워 둔다.
                 const SizedBox(width: 8.0),
