@@ -87,6 +87,10 @@ class RemoveAdsButton extends StatelessWidget {
           overflow: TextOverflow.fade,
           style: FlutterFlowTheme.of(context).bodySmall.override(
                 color: fg,
+                // 광고 옆 여백은 411dp 화면에서도 67dp 뿐이다. 기본 크기로는
+                // 영어 "Remove ads" 조차 잘렸다. 여기서 한 단계 줄이면
+                // 한국어와 영어는 들어가고, 더 긴 언어는 흐리게 흘린다.
+                fontSize: 11.0,
                 letterSpacing: 0.0,
               ),
         ),

@@ -226,7 +226,9 @@ class _FlutterFlowAdBannerState extends State<FlutterFlowAdBanner> {
           final bool roomForLabel =
               constraints.maxWidth >= kLabeledRemoveAdsMinWidth;
 
-          final Widget slot = banner != null && adWidget != null
+          final bool hasAd = banner != null && adWidget != null;
+
+          final Widget slot = hasAd
               ? SizedBox(
                   width: banner.size.width.toDouble(),
                   height: banner.size.height.toDouble(),
@@ -240,7 +242,10 @@ class _FlutterFlowAdBannerState extends State<FlutterFlowAdBanner> {
 
           return Row(
             children: [
-              if (roomForButton) ...[
+              // 광고가 있을 때만 이 버튼을 그린다. 광고가 없으면 그 자리에
+              // "광고 없이 사용하기"가 이미 크게 떠 있으므로, 옆에 같은 뜻의
+              // 작은 버튼을 또 두면 한 화면에서 같은 말을 두 번 하게 된다.
+              if (roomForButton && hasAd) ...[
                 RemoveAdsButton(
                   showLabel: roomForLabel,
                   // 남는 자리에서 죽은 공간 8 과 버튼 좌우 여백 16 을 뺀 만큼.
@@ -251,7 +256,7 @@ class _FlutterFlowAdBannerState extends State<FlutterFlowAdBanner> {
                 // 누르면 무효 클릭이 되므로 반드시 띄워 둔다.
                 const SizedBox(width: 8.0),
               ],
-              if (banner != null && adWidget != null) const Spacer(),
+              if (hasAd) const Spacer(),
               slot,
             ],
           );
