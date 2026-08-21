@@ -1,0 +1,3 @@
+• Artık reklamları kaldırabilirsiniz. Tek seferlik satın alma reklamları kalıcı olarak kaldırır.
+• Reklam yüklenirken banner alanı artık boş kalmıyor.
+• Telefon değiştirdiyseniz veya yeniden kurduysanız "Satın alımı geri yükle" seçeneğini kullanın.

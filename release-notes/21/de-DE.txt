@@ -1,0 +1,3 @@
+• Werbung lässt sich jetzt entfernen. Ein einmaliger Kauf entfernt sie dauerhaft.
+• Der Bannerbereich bleibt nicht mehr leer, während eine Anzeige geladen wird.
+• Nach Gerätewechsel oder Neuinstallation über „Kauf wiederherstellen“ zurückholen.

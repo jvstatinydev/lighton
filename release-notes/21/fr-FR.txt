@@ -1,0 +1,3 @@
+• Vous pouvez désormais supprimer les publicités. Un seul achat les retire définitivement.
+• L'emplacement de la bannière ne reste plus vide pendant le chargement d'une publicité.
+• Après un changement d'appareil ou une réinstallation, utilisez « Restaurer l'achat ».
