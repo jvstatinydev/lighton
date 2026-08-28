@@ -75,7 +75,24 @@ android {
             // `flutter run --release`가 로컬에서 계속 동작하도록 한다.
             // Play 업로드용 빌드는 반드시 key.properties가 있어야 한다.
             signingConfig keystorePropertiesFile.exists() ? signingConfigs.release : signingConfigs.debug
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+
+            // R8: 코드 축소 + 최적화 + 리소스 축소.
+            //
+            // Flutter Gradle 플러그인이 릴리스 빌드에 minify/shrinkResources 를
+            // 이미 켜주지만(-Pshrink=false 로만 끌 수 있다), 무엇이 켜져 있는지
+            // 이 파일만 보고 알 수 있도록 명시한다.
+            minifyEnabled true
+            shrinkResources true
+
+            // proguard-android.txt 가 아니라 -optimize 판을 쓴다.
+            // 전자에는 `-dontoptimize` 가 들어 있어서, 규칙 파일 하나만 들어와도
+            // R8 의 최적화 단계가 통째로 꺼진다. 이 프로젝트가 정확히 그 상태였다
+            // (Flutter 가 넣어주는 -optimize 판 위에 이 파일이 비최적화 판을
+            // 덧붙이고 있었다). 그래서 축소·난독화는 되는데 최적화만 빠진 AAB 가
+            // 올라갔고, Play Console 이 1.0.7 에 "최적화가 사용 설정되지 않음"
+            // 이라고 경고했다. AGP 9 부터는 proguard-android.txt 지원 자체가
+            // 사라지므로 어차피 이쪽으로 와야 한다.
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
 }
