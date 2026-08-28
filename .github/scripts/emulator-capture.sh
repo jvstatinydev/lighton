@@ -51,8 +51,10 @@ sleep "$SETTLE_SECONDS"
 # 교훈은 하나다. 회전은 종료 코드로 판정할 수 없다. 실제 방향을 다시 읽어서
 # 확인해야 하고, 확인될 때까지 다음 방법으로 넘어가야 한다.
 #
-# 방법 세 가지를 순서대로 시도한다. `user-rotation` 이 현재 이름이고
+# 방법 네 가지를 순서대로 시도한다. `user-rotation` 이 현재 이름이고
 # `set-user-rotation` 은 예전 이름이라 안드로이드 버전에 따라 하나만 존재한다.
+# 셋 다 게스트 안에서 도는 명령이라 안드로이드 버전을 타므로, 마지막에는
+# 버전과 무관한 에뮬레이터 콘솔(`adb emu rotate`)까지 내려간다.
 ROTATE_FAILED=0
 
 # 디스플레이가 실제로 어느 방향인지 읽는다. 못 읽으면 빈 문자열.
@@ -67,6 +69,20 @@ wait_for_rotation() {
   for i in $(seq 1 12); do
     sleep 1
     [ "$(actual_rotation)" = "$want" ] && return 0
+  done
+  return 1
+}
+
+# 마지막 수단. 게스트가 아니라 에뮬레이터 콘솔에 시키는 것이라 안드로이드
+# 버전과 무관하다. 다만 절대 각도를 못 주고 90도씩 돌기만 하므로, 원하는
+# 방향이 될 때까지 최대 세 번 돌린다.
+rotate_via_emu() {
+  local want="$1" i
+  for i in 1 2 3; do
+    adb emu rotate >/dev/null 2>&1 || return 1
+    if wait_for_rotation "$want"; then
+      return 0
+    fi
   done
   return 1
 }
@@ -92,6 +108,12 @@ rotate() {
     fi
     echo "rotation=$rotation: '$method' 는 듣지 않았다"
   done
+  if rotate_via_emu "$rotation"; then
+    echo "rotation=$rotation: 'adb emu rotate' 로 적용됨"
+    sleep 5
+    return 0
+  fi
+  echo "rotation=$rotation: 'adb emu rotate' 도 듣지 않았다"
   return 1
 }
 
