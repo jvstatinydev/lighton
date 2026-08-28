@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart' show debugPrint, immutable;
 import 'package:flutter/widgets.dart';
 
 /// 시스템 바(상태바·내비게이션 바·디스플레이 컷아웃)가 화면에서 차지하는 폭.

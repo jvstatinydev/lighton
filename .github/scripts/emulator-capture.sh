@@ -117,16 +117,49 @@ rotate() {
   return 1
 }
 
+# 지금 화면 맨 앞에 있는 창.
+focused_window() {
+  adb shell dumpsys window 2>/dev/null \
+    | grep -m1 'mCurrentFocus=' | tr -d '\r' | sed 's/^ *//'
+}
+
+# 스크린샷에 찍히는 것이 정말 우리 앱인지 확인하고, 아니면 되돌린다.
+#
+# API 34 캡처에서 "Pixel Launcher isn't responding" ANR 창이 앱 위에 떠서
+# 화면 전체에 어두운 막이 깔린 스크린샷이 나왔다. 그 그림으로 배치를 판단하면
+# 색도 배치도 틀리게 읽는다. 회전과 같은 부류의 함정이라 같은 방식으로 막는다
+# -- 확인하고, 안 되면 소리 내어 남긴다.
+ensure_foreground() {
+  local focus
+  focus="$(focused_window)"
+  case "$focus" in
+    *"$PACKAGE"*) return 0 ;;
+  esac
+  echo "포커스가 우리 앱이 아니다: $focus"
+  adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS >/dev/null 2>&1 || true
+  adb shell monkey -p "$PACKAGE" -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1 || true
+  sleep 5
+  focus="$(focused_window)"
+  case "$focus" in
+    *"$PACKAGE"*) echo "앱을 다시 앞으로 불러왔다" ; return 0 ;;
+  esac
+  echo "::warning::스크린샷에 우리 앱이 아닌 창이 떠 있습니다: $focus"
+  return 1
+}
+
 capture() {
   local rotation="$1" name="$2"
-  local got
+  local got focus
   if ! rotate "$rotation"; then
     ROTATE_FAILED=1
   fi
+  ensure_foreground || true
   got="$(actual_rotation)"
+  focus="$(focused_window)"
   adb exec-out screencap -p >"$OUT/${name}.png"
   echo "captured $OUT/${name}.png (요청 rotation=$rotation, 실제 ROTATION_${got:-?})"
-  echo "${name} requested=${rotation} actual=${got:-unknown}" >>"$OUT/rotation-log.txt"
+  echo "${name} requested=${rotation} actual=${got:-unknown} focus=${focus:-unknown}" \
+    >>"$OUT/rotation-log.txt"
   if [ -n "$got" ] && [ "$got" != "$rotation" ]; then
     # 경고가 아니라 오류다. 방향이 안 바뀐 스크린샷은 틀린 답을 자신 있게
     # 내놓는다 -- 가로 배치를 확인했다고 착각하게 만든다. 잡을 끝에서
@@ -150,6 +183,7 @@ capture 0 03-portrait-again
 rotate 0 || ROTATE_FAILED=1
 
 echo "::group::Tap center (torch button)"
+ensure_foreground || true
 SIZE="$(adb shell wm size | tail -1 | tr -d '\r' | sed 's/.*: //')"
 TAP_X=$(( ${SIZE%x*} / 2 ))
 TAP_Y=$(( ${SIZE#*x} / 2 ))

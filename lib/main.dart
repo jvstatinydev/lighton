@@ -2,6 +2,7 @@ import 'dart:async' show unawaited;
 
 import 'package:provider/provider.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show SystemChrome, SystemUiMode;
 
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
@@ -16,6 +17,24 @@ void main() async {
   // WidgetsFlutterBinding.ensureInitialized() 보다도 앞이었다. 지금은 플래시
   // 초기화가 따로 없다 — 첫 사용 시점에 카메라를 조회한다.
   WidgetsFlutterBinding.ensureInitialized();
+
+  // 안드로이드 15(SDK 35) 부터는 시스템이 앱을 화면 끝까지 그리게 하고 상태바와
+  // 내비게이션 바를 그 위에 겹쳐 그린다(edge-to-edge). 그 아래 버전에서는 시스템
+  // 바가 여전히 화면을 나눠 갖는다. 즉 같은 앱이 안드로이드 버전에 따라 다르게
+  // 배치되고, 에뮬레이터(API 36)에서 확인한 그림이 옛 기기에서도 같다는 보장이
+  // 없다. 실제로 API 34 캡처에서는 내비게이션 바가 불투명한 검은 띠였다.
+  //
+  // 여기서 명시적으로 켜서 어느 버전에서든 같게 만든다. Play Console 이
+  // "이전 버전과의 호환성을 위해 enableEdgeToEdge() 를 호출하세요" 라고 안내하는
+  // 그 자리다. AndroidX 의 그 확장 함수는 ComponentActivity 에 붙어 있는데
+  // FlutterActivity 는 android.app.Activity 를 상속하므로 그대로는 쓸 수 없고,
+  // Flutter 에서는 이 호출이 같은 일을 한다.
+  //
+  // 비켜야 할 폭은 home_page 의 SafeArea 가 이미 처리한다 -- 이 호출은 그
+  // 처리를 옛 버전에도 적용시킬 뿐, 새로 필요하게 만들지 않는다. API 29 미만
+  // 에서는 아무 일도 하지 않는다.
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+
   GoRouter.optionURLReflectsImperativeAPIs = true;
   usePathUrlStrategy();
 

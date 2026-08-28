@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show DebugPrintCallback, debugPrint;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:light_on_flashlight/flutter_flow/edge_to_edge_util.dart';
