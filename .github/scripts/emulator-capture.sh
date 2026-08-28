@@ -58,9 +58,26 @@ sleep "$SETTLE_SECONDS"
 ROTATE_FAILED=0
 
 # 디스플레이가 실제로 어느 방향인지 읽는다. 못 읽으면 빈 문자열.
+#
+# dumpsys 가 내놓는 이름이 요청하는 값과 다르다. API 36 은 rotation 1 을
+# `mDisplayRotation=ROTATION_90` 이라고 적는다(순번이 아니라 각도). 어느 쪽으로
+# 적히든 받아서 순번으로 맞춰 돌려준다.
+#
+# 이걸 몰라서 한 번 헛돌았다. API 36 에서 `cmd window user-rotation lock 1` 이
+# 실제로는 화면을 돌렸는데, 읽은 값이 "90" 이라 요청한 "1" 과 달랐고, 스크립트는
+# 안 돌았다고 판단해 나머지 방법을 차례로 다 시도했다. 결과 사진은 멀쩡한
+# 가로였는데 잡은 빨간불이었다.
 actual_rotation() {
-  adb shell dumpsys window displays 2>/dev/null \
-    | grep -o 'mDisplayRotation=ROTATION_[0-9]*' | head -1 | sed 's/.*ROTATION_//'
+  local raw
+  raw="$(adb shell dumpsys window displays 2>/dev/null \
+    | grep -o 'mDisplayRotation=ROTATION_[0-9]*' | head -1 | sed 's/.*ROTATION_//')"
+  case "$raw" in
+    0) echo 0 ;;
+    1 | 90) echo 1 ;;
+    2 | 180) echo 2 ;;
+    3 | 270) echo 3 ;;
+    *) echo "" ;;
+  esac
 }
 
 # 방향이 요청대로 바뀌기를 최대 12초 기다린다. 바뀌면 0, 아니면 1.
@@ -171,7 +188,11 @@ capture() {
 
 capture 0 01-portrait
 capture 1 02-landscape
-capture 0 03-portrait-again
+# 반대쪽 가로도 찍는다. 컷아웃과 내비게이션 바가 왼쪽이 아니라 오른쪽으로
+# 오는 배치라, 배너(320dp 고정)와 "광고 제거" 버튼이 남는 폭을 나눠 갖는
+# 계산이 여기서 가장 빡빡해진다. 90 만 보고 넘어가면 그 절반을 못 본다.
+capture 3 03-landscape-reversed
+capture 0 04-portrait-again
 
 # 홈 화면의 토치 버튼을 눌러본다. 에뮬레이터에는 플래시가 없으므로 이건
 # "플래시 없는 기기" 경로를 타고, 앱이 죽지 않는지와 무엇을 보여주는지를 본다.
@@ -190,7 +211,7 @@ TAP_Y=$(( ${SIZE#*x} / 2 ))
 echo "screen=$SIZE tap=($TAP_X,$TAP_Y)"
 adb shell input tap "$TAP_X" "$TAP_Y" || true
 sleep 5
-adb exec-out screencap -p >"$OUT/04-after-tap.png"
+adb exec-out screencap -p >"$OUT/05-after-tap.png"
 echo "::endgroup::"
 
 echo "::group::Collect logs"
