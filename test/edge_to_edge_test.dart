@@ -5,32 +5,32 @@ import 'package:light_on_flashlight/flutter_flow/edge_to_edge_util.dart';
 
 /// 주어진 MediaQuery 아래에서 [SystemInsets.of] 가 읽는 값을 돌려준다.
 ///
-/// [insideSafeArea] 가 true 면 SafeArea 안쪽에서 읽는다. SafeArea 는 자기가
-/// 소비한 만큼 padding 을 0 으로 깎으므로, 여기서 값이 달라지면 잘못된 필드를
-/// 읽고 있다는 뜻이다.
+/// [padding] 을 따로 줄 수 있게 해 둔 것은 키보드 때문이다. 키보드가 올라오면
+/// 프레임워크가 padding 의 아래쪽만 0 으로 깎고 viewPadding 은 그대로 둔다.
 Future<SystemInsets> read(
   WidgetTester tester, {
   required Size size,
   required EdgeInsets viewPadding,
-  bool insideSafeArea = false,
+  EdgeInsets? padding,
+  EdgeInsets viewInsets = EdgeInsets.zero,
 }) async {
   late SystemInsets got;
-  final Widget probe = Builder(
-    builder: (BuildContext context) {
-      got = SystemInsets.of(context);
-      return const SizedBox.shrink();
-    },
-  );
   await tester.pumpWidget(
     MediaQuery(
       data: MediaQueryData(
         size: size,
         viewPadding: viewPadding,
-        padding: viewPadding,
+        padding: padding ?? viewPadding,
+        viewInsets: viewInsets,
       ),
       child: Directionality(
         textDirection: TextDirection.ltr,
-        child: insideSafeArea ? SafeArea(child: probe) : probe,
+        child: Builder(
+          builder: (BuildContext context) {
+            got = SystemInsets.of(context);
+            return const SizedBox.shrink();
+          },
+        ),
       ),
     ),
   );
@@ -55,16 +55,17 @@ void main() {
       expect(insets.isPortrait, isTrue);
     });
 
-    testWidgets('SafeArea 안에서도 같은 값을 읽는다', (WidgetTester tester) async {
-      // padding 을 읽으면 여기서 0 이 나온다. SafeArea 가 이미 소비했기
-      // 때문이다. 그러면 "시스템 바가 몇 dp 를 먹었나" 라는 질문에, 트리
-      // 어디에서 물어보느냐에 따라 다른 답이 나온다. viewPadding 은 깎이지
-      // 않으므로 어디서 읽든 같다.
+    testWidgets('키보드가 올라와도 내비게이션 바 폭은 그대로 읽는다',
+        (WidgetTester tester) async {
+      // 키보드가 뜨면 프레임워크가 padding 의 아래쪽을 0 으로 깎는다.
+      // padding 을 읽으면 여기서 0 이 나오고, 그러면 "내비게이션 바가 몇 dp 를
+      // 먹었나" 라는 질문에 키보드 상태에 따라 다른 답이 나온다.
       final SystemInsets insets = await read(
         tester,
         size: const Size(411, 914),
         viewPadding: const EdgeInsets.only(top: 48.0, bottom: 24.0),
-        insideSafeArea: true,
+        padding: const EdgeInsets.only(top: 48.0),
+        viewInsets: const EdgeInsets.only(bottom: 300.0),
       );
 
       expect(insets.top, 48.0);
@@ -109,15 +110,6 @@ void main() {
       // build 에서 부르므로 프레임마다 같은 줄이 쌓이면 logcat 에서 정작
       // 볼 것을 밀어낸다. emulator-check.yml 이 읽는 파일이 그렇게 되면
       // 진단으로서 쓸모가 없어진다.
-      final List<String> lines = <String>[];
-      final DebugPrintCallback original = debugPrint;
-      debugPrint = (String? message, {int? wrapWidth}) {
-        if (message != null) {
-          lines.add(message);
-        }
-      };
-      addTearDown(() => debugPrint = original);
-
       Future<void> pumpWith(EdgeInsets viewPadding) => tester.pumpWidget(
             MediaQuery(
               data: MediaQueryData(
@@ -137,18 +129,32 @@ void main() {
             ),
           );
 
-      await pumpWith(const EdgeInsets.only(top: 48.0, bottom: 24.0));
-      expect(lines.length, 1);
+      // debugPrint 는 테스트 본문이 끝나기 *전에* 되돌려야 한다. flutter_test
+      // 가 본문 직후에 foundation 디버그 변수가 원래대로인지 검사하므로,
+      // addTearDown 으로 미루면 그 검사에 걸린다.
+      final List<String> lines = <String>[];
+      final DebugPrintCallback original = debugPrint;
+      debugPrint = (String? message, {int? wrapWidth}) {
+        if (message != null) {
+          lines.add(message);
+        }
+      };
+      try {
+        await pumpWith(const EdgeInsets.only(top: 48.0, bottom: 24.0));
+        expect(lines.length, 1);
 
-      // 같은 값으로 다시 그려도 늘지 않는다.
-      await pumpWith(const EdgeInsets.only(top: 48.0, bottom: 24.0));
-      await tester.pump();
-      expect(lines.length, 1);
+        // 같은 값으로 다시 그려도 늘지 않는다.
+        await pumpWith(const EdgeInsets.only(top: 48.0, bottom: 24.0));
+        await tester.pump();
+        expect(lines.length, 1);
 
-      // 방향이 바뀌면(= 값이 바뀌면) 한 번 더 찍힌다.
-      await pumpWith(const EdgeInsets.only(left: 48.0));
-      expect(lines.length, 2);
-      expect(lines.last, startsWith('System insets:'));
+        // 방향이 바뀌면(= 값이 바뀌면) 한 번 더 찍힌다.
+        await pumpWith(const EdgeInsets.only(left: 48.0));
+        expect(lines.length, 2);
+        expect(lines.last, startsWith('System insets:'));
+      } finally {
+        debugPrint = original;
+      }
     });
   });
 }

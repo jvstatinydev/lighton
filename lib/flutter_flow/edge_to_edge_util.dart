@@ -22,9 +22,15 @@ class SystemInsets {
 
   /// 화면에 실제로 그려진 상태에서 읽는다.
   ///
-  /// `padding` 이 아니라 `viewPadding` 을 쓴다. padding 은 SafeArea 가 이미
-  /// 소비한 만큼 0 으로 깎여서, 위젯 트리 어디에서 읽느냐에 따라 값이 달라진다.
-  /// viewPadding 은 깎이지 않으므로 "시스템 바가 먹은 폭" 을 그대로 준다.
+  /// `padding` 이 아니라 `viewPadding` 을 쓴다. 둘의 차이는 키보드다. padding
+  /// 은 키보드가 올라오면 그만큼 아래쪽이 0 으로 깎이지만, viewPadding 은
+  /// 그대로 남는다. 여기서 알고 싶은 것은 "시스템 바가 먹은 폭" 이지 "지금
+  /// 남은 여백" 이 아니므로 깎이지 않는 쪽을 읽는다.
+  ///
+  /// 다만 SafeArea 안쪽에서는 둘 다 0 이 된다. SafeArea 는 자기가 비켜준
+  /// 만큼을 padding 과 viewPadding 양쪽에서 빼기 때문이다(MediaQueryData
+  /// .removePadding). 그러니 이 값은 SafeArea *바깥* 에서 읽어야 하고,
+  /// home_page 는 Scaffold 를 만들기 전에 부른다.
   factory SystemInsets.of(BuildContext context) {
     final MediaQueryData media = MediaQuery.of(context);
     return SystemInsets(
