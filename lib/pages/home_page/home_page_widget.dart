@@ -1,3 +1,4 @@
+import '/flutter_flow/edge_to_edge_util.dart' show logSystemInsets;
 import '/flutter_flow/flutter_flow_ad_banner.dart';
 import '/flutter_flow/flutter_flow_animations.dart';
 import '/flutter_flow/flutter_flow_language_selector.dart';
@@ -162,6 +163,12 @@ class _HomePageWidgetState extends State<HomePageWidget>
   @override
   Widget build(BuildContext context) {
     context.watch<FFAppState>();
+
+    // 시스템 바가 먹은 폭을 logcat 에 한 번 남긴다. edge-to-edge 에서는 이
+    // 값이 곧 아래 SafeArea 가 비켜줘야 하는 폭이라, 배치가 틀렸을 때 무엇과
+    // 비교해야 하는지가 이 숫자다. 값이 바뀔 때만 찍으므로 프레임마다 쌓이지
+    // 않는다(lib/flutter_flow/edge_to_edge_util.dart).
+    logSystemInsets(context);
 
     // 플래시가 없어 화면을 조명으로 쓰는 기기에서, 조명이 켜져 있는 동안.
     // 이때는 테마(다크 모드 포함)와 무관하게 화면을 최대한 하얗게 만든다.
