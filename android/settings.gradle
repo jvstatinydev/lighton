@@ -21,7 +21,14 @@ plugins {
     // Flutter 3.44.8이 요구하는 최소 버전: AGP 8.11.1 / Kotlin 2.2.20
     // Kotlin은 2.3.20 사용 — play-services-ads 25.3.0이 Kotlin 2.3.0
     // 메타데이터로 컴파일되어 있어 2.1.x 컴파일러로는 읽지 못한다.
-    id "com.android.application" version "8.11.1" apply false
+    //
+    // AGP는 8.x의 마지막인 8.13.2. 최소값(8.11.1)보다 앞선 이유가 둘 있다.
+    //  - android.r8.optimizedResourceShrinking 은 AGP 8.12 부터 있다.
+    //  - 8.13.2 의 R8(8.13.19)이 Kotlin 2.3 메타데이터를 읽을 수 있다. 최적화가
+    //    켜지면 R8 이 play-services-ads 의 Kotlin 메타데이터까지 파싱한다.
+    // Gradle 8.14(gradle-wrapper.properties)는 AGP 8.13 의 최소값 8.13 이상이다.
+    // AGP 9 로 가지 않는 이유는 CLAUDE.md 의 Android release 절에 적어두었다.
+    id "com.android.application" version "8.13.2" apply false
     id "org.jetbrains.kotlin.android" version "2.3.20" apply false
     
     
