@@ -24,11 +24,18 @@ void main() async {
   // 배치되고, 에뮬레이터(API 36)에서 확인한 그림이 옛 기기에서도 같다는 보장이
   // 없다. 실제로 API 34 캡처에서는 내비게이션 바가 불투명한 검은 띠였다.
   //
-  // 여기서 명시적으로 켜서 어느 버전에서든 같게 만든다. Play Console 이
-  // "이전 버전과의 호환성을 위해 enableEdgeToEdge() 를 호출하세요" 라고 안내하는
-  // 그 자리다. AndroidX 의 그 확장 함수는 ComponentActivity 에 붙어 있는데
-  // FlutterActivity 는 android.app.Activity 를 상속하므로 그대로는 쓸 수 없고,
-  // Flutter 에서는 이 호출이 같은 일을 한다.
+  // 여기서 명시적으로 켜서 어느 버전에서든 같은 *배치*가 되게 한다. Play
+  // Console 이 "이전 버전과의 호환성을 위해 enableEdgeToEdge() 를 호출하세요"
+  // 라고 안내하는 그 자리다. AndroidX 의 그 확장 함수는 ComponentActivity 에
+  // 붙어 있는데 FlutterActivity 는 android.app.Activity 를 상속하므로 그대로는
+  // 쓸 수 없고, Flutter 에서는 이 호출이 같은 일을 한다.
+  //
+  // 배치까지만이다. API 34 에뮬레이터로 확인해 보면 창은 이제 API 36 과 같은
+  // 하단 24dp 인셋을 받지만, 화면은 여전히 다르다 -- 내비게이션 바가 불투명한
+  // 검은 띠로 남는다. 바의 *색*은 이 모드가 아니라 SystemUiOverlayStyle 이
+  // 정하고 그 기본값이 불투명하기 때문이다. 색까지 맞추려면 statusBarColor 와
+  // systemNavigationBarColor 를 투명으로 둬야 하는데, 그게 바로 Play 의 다른
+  // 안내가 "deprecated" 라고 지목하는 API 라서 건드리지 않는다.
   //
   // 비켜야 할 폭은 home_page 의 SafeArea 가 이미 처리한다 -- 이 호출은 그
   // 처리를 옛 버전에도 적용시킬 뿐, 새로 필요하게 만들지 않는다. API 29 미만
