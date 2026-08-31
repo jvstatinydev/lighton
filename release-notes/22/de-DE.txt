@@ -1,0 +1,2 @@
+• Die App benötigt jetzt weniger Speicherplatz.
+• Die Abstände an den Bildschirmrändern wurden überarbeitet und sehen nun auf allen Android-Versionen gleich aus.

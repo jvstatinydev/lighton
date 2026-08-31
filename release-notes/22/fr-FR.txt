@@ -1,0 +1,2 @@
+• L'application occupe désormais moins d'espace sur votre téléphone.
+• Les marges sur les bords de l'écran ont été revues : l'affichage est identique sur toutes les versions d'Android.

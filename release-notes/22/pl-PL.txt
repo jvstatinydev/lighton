@@ -1,0 +1,2 @@
+• Aplikacja zajmuje teraz mniej miejsca w telefonie.
+• Dopracowaliśmy marginesy przy krawędziach ekranu — wyglądają tak samo w każdej wersji Androida.
