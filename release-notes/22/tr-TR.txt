@@ -1,0 +1,2 @@
+• Uygulama telefonunuzda daha az yer kaplıyor.
+• Ekran kenarlarındaki boşluklar iyileştirildi; artık tüm Android sürümlerinde aynı görünüyor.

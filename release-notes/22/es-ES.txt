@@ -1,0 +1,2 @@
+• La aplicación ocupa menos espacio en tu teléfono.
+• Hemos ajustado los márgenes de los bordes de la pantalla para que se vean igual en todas las versiones de Android.

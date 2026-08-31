@@ -1,0 +1,2 @@
+• The app now takes up less space on your phone.
+• Refined the spacing at the screen edges so it looks the same across Android versions.
