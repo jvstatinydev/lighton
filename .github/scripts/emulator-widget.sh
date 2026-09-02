@@ -82,7 +82,10 @@ if wait_for_adb && [ "$(adb shell id -u | tr -d '\r')" = "0" ]; then
   ROOT_OK=1
 fi
 if [ "$ROOT_OK" = "1" ]; then
-  APP_UID="$(adb shell dumpsys package "$PACKAGE" | tr -d '\r' | grep -m1 -o 'userId=[0-9]*' | cut -d= -f2)"
+  # 앱 데이터 디렉터리의 소유자가 곧 앱 uid 다. dumpsys package 의 userId=
+  # 줄을 긁는 것보다 확실하다(그 방법은 API 36 에서 빈 값을 줬고, chown 을
+  # 건너뛰어 root 소유 파일이 남는 바람에 앱이 구매 캐시를 읽지 못했다).
+  APP_UID="$(adb shell stat -c %u "/data/data/$PACKAGE" | tr -d '\r')"
   widget_log "2/3 adb root 됨, 앱 uid=${APP_UID:-?}"
   # 앱 프로세스가 파일을 캐시하고 있으므로 세운 뒤에 쓴다.
   adb shell am force-stop "$PACKAGE"
@@ -94,7 +97,8 @@ if [ "$ROOT_OK" = "1" ]; then
   if [ -n "$APP_UID" ]; then
     adb shell "chown $APP_UID:$APP_UID '$PREFS_DIR' '$PREFS'"
   fi
-  adb shell "chmod 700 '$PREFS_DIR'; chmod 660 '$PREFS'"
+  adb shell "chmod 700 '$PREFS_DIR'; chmod 660 '$PREFS'; restorecon -R '$PREFS_DIR'"
+  adb shell ls -lZ "$PREFS_DIR" | tr -d '\r' | tee -a "$OUT/widget-log.txt"
   adb shell cat "$PREFS" | tr -d '\r' >"$OUT/widget-prefs.xml"
   if grep -q '__ads_removed__' "$OUT/widget-prefs.xml"; then
     WIDGET_UNLOCKED=1
@@ -176,8 +180,26 @@ place_widget() {
   else
     widget_log "위젯 목록의 검색창을 찾지 못했다 -- 스크롤 없이 시도한다"
   fi
+  # 키보드가 올라와 있으면 내린다. 키보드가 떠 있을 때 BACK 은 키보드만 닫는다.
+  if adb shell dumpsys input_method | grep -q "mInputShown=true"; then
+    adb shell input keyevent KEYCODE_BACK
+    sleep 1
+  fi
   adb exec-out screencap -p >"$OUT/06a-widget-picker.png"
-  adb exec-out uiautomator dump /dev/tty 2>/dev/null | tr -d '\r' >"$OUT/widget-dump-picker.xml" || true
+  adb exec-out uiautomator dump /dev/tty 2>/dev/null | tr -d '\r' >"$OUT/widget-dump-picker.xml"
+
+  # 검색 결과는 앱 한 줄로 접혀 있다("Light On - Flashlight" 아래에 위젯 이름이
+  # 쉼표로 나열된다). 줄을 눌러 펼쳐야 위젯 미리보기가 나온다.
+  center="$(node_center text "Light On - Flashlight")"
+  if [ -n "$center" ]; then
+    # shellcheck disable=SC2086
+    adb shell input tap $center
+    sleep 3
+  else
+    widget_log "위젯 목록에서 앱 줄을 찾지 못했다"
+  fi
+  adb exec-out screencap -p >"$OUT/06b-widget-picker-expanded.png"
+  adb exec-out uiautomator dump /dev/tty 2>/dev/null | tr -d '\r' >"$OUT/widget-dump-picker-expanded.xml"
 
   # 우리 앱의 4×4 위젯. 런처는 미리보기의 content-desc 나 text 에 위젯 라벨을 쓴다.
   center="$(node_center content-desc "Flashlight (Large)")"
@@ -185,7 +207,7 @@ place_widget() {
     center="$(node_center text "Flashlight (Large)")"
   fi
   if [ -z "$center" ]; then
-    widget_log "위젯 목록에서 'Flashlight (Large)' 를 찾지 못했다 (widget-dump-picker.xml 참고)"
+    widget_log "위젯 목록에서 'Flashlight (Large)' 를 찾지 못했다 (widget-dump-picker-expanded.xml 참고)"
     adb shell input keyevent KEYCODE_BACK || true
     return 1
   fi
