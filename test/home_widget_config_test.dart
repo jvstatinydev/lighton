@@ -178,6 +178,20 @@ void main() {
     }
   });
 
+  group('앱을 띄우는 인텐트', () {
+    // flutter_deeplinking_enabled 가 켜져 있어서, data URI 가 있는 인텐트로
+    // MainActivity 를 띄우면 FlutterActivity 가 그 경로를 go_router 에 밀어
+    // 넣는다. 홈 페이지가 새로 열리며 위젯이 넘긴 동작(결제 시트 열기)이
+    // 사라진다. 에뮬레이터에서 실제로 그랬다. 동작 구분은 action 문자열로 한다.
+    test('위젯이 앱을 띄울 때 data URI 를 쓰지 않는다', () {
+      final String provider = File(
+        'android/app/src/main/kotlin/com/mycompany/lightonflashlight/TorchWidgetProvider.kt',
+      ).readAsStringSync();
+      expect(provider, isNot(contains('.setData(')));
+      expect(provider, contains('.putExtra(EXTRA_LAUNCH_ACTION, action)'));
+    });
+  });
+
   group('XML 주석', () {
     // aapt 는 주석 안의 "--" 를 거부한다(XML 규격). 이 저장소의 한국어 주석은
     // 줄표로 "--" 를 즐겨 쓰므로 리소스 XML 에 옮겨 적다가 그대로 들어가기

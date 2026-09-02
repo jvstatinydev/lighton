@@ -6,7 +6,6 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.view.View
@@ -186,13 +185,19 @@ abstract class TorchWidgetProvider : AppWidgetProvider() {
          * Activity 시작 제한에 걸린다. 런처가 보내는 PendingIntent 는 그 제한을
          * 받지 않는다.
          *
-         * data 에 action 을 넣는 이유: PendingIntent 는 extra 를 비교하지 않아서,
-         * extra 만 다른 두 인텐트가 같은 PendingIntent 로 합쳐진다.
+         * action 문자열에 동작을 넣는 이유: PendingIntent 는 extra 를 비교하지
+         * 않아서, extra 만 다른 두 인텐트가 같은 PendingIntent 로 합쳐진다.
+         * 명시적 컴포넌트 인텐트라 action 은 필터 매칭에 쓰이지 않고 구분용일 뿐이다.
+         *
+         * **data URI 를 넣으면 안 된다.** 매니페스트에 flutter_deeplinking_enabled
+         * 가 켜져 있어서 FlutterActivity 가 data 가 있는 인텐트를 딥링크로 보고
+         * 그 경로를 go_router 에 밀어 넣는다. 그러면 홈 페이지가 새로 열리며
+         * 결제 시트를 열어야 할 페이지가 사라진다. 에뮬레이터에서 실제로 그랬다.
+         * test/home_widget_config_test.dart 가 setData 를 막는다.
          */
         private fun launchApp(context: Context, action: String, appWidgetId: Int): PendingIntent {
             val intent = Intent(context, MainActivity::class.java)
-                .setAction(Intent.ACTION_MAIN)
-                .setData(Uri.parse("lighton://widget/$action"))
+                .setAction("${context.packageName}.action.OPEN_$action")
                 .putExtra(EXTRA_LAUNCH_ACTION, action)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
             return PendingIntent.getActivity(
