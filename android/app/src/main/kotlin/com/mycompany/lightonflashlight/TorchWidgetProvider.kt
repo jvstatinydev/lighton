@@ -86,12 +86,15 @@ abstract class TorchWidgetProvider : AppWidgetProvider() {
             updateAll(context)
             return
         }
-        if (TorchMonitor.isOn(cameraId)) {
-            TorchService.turnOff(context, cameraId)
-        } else {
+        val turnOn = !TorchMonitor.isOn(cameraId)
+        // 켜는 쪽은 서비스가 비동기로 하므로 여기서 상태를 다시 읽으면 아직 꺼짐이다.
+        // 로그는 요청한 방향을 적는다.
+        Log.i(TorchDevice.TAG, "위젯 탭: 카메라 $cameraId -> ${if (turnOn) "켜짐" else "꺼짐"} 요청")
+        if (turnOn) {
             TorchService.turnOn(context, cameraId)
+        } else {
+            TorchService.turnOff(context, cameraId)
         }
-        Log.i(TorchDevice.TAG, "위젯 탭: 카메라 $cameraId -> ${if (TorchMonitor.isOn(cameraId)) "켜짐" else "꺼짐"}")
     }
 
     companion object {

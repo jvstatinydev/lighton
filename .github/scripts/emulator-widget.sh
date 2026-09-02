@@ -3,32 +3,35 @@
 # 홈 화면 위젯을 에뮬레이터에서 확인한다. emulator-capture.sh 가 앱 캡처를 마친
 # 뒤 source 로 불러 쓴다. $PACKAGE, $OUT 을 물려받는다.
 #
-# 세 단계다.
+# 네 단계다. 잠긴 상태를 먼저 보고, 그 다음에 구매한 상태를 만든다.
 #
 #  1. 잠긴 리시버(확정적). 위젯 탭이 보내는 것과 같은 브로드캐스트를 adb 로
 #     보낸다. "광고 제거" 를 안 샀으니 아무 일도 없어야 한다.
-#  2. 풀린 리시버(확정적, root 가 되는 이미지에서만). google_apis 이미지는
+#  2. 런처에 놓기(최선 노력). 실제 런처의 위젯 목록에서 "Flashlight (Large)" 를
+#     찾아 홈 화면에 끌어다 놓고 잠긴 모습을 찍는다. 잠긴 위젯을 누르면 앱이
+#     결제 시트를 연 채로 떠야 한다. UI 자동화라 런처 버전에 따라 깨질 수
+#     있어서 실패해도 경고만 남긴다.
+#  3. 풀린 리시버(확정적, root 가 되는 이미지에서만). google_apis 이미지는
 #     `adb root` 가 되므로 Dart 가 저장하는 것과 같은 키를 shared_preferences
 #     파일에 직접 써서 구매한 상태를 만든다. 그 뒤 같은 브로드캐스트로
 #     TorchService 가 뜨고 토치가 켜지는지, 한 번 더 보내 꺼지고 서비스가
-#     스스로 멈추는지 본다. 위젯을 놓지 않아도 되고 런처와 무관하다.
-#     여기서 실패하면 잡이 빨간불이다.
-#  3. 런처(최선 노력). 실제 런처의 위젯 목록에서 "Flashlight (Large)" 를 찾아
-#     홈 화면에 끌어다 놓고, 스크린샷을 찍고, 눌러 본다. UI 자동화라 런처
-#     버전에 따라 깨질 수 있어서 실패해도 경고만 남긴다. 성공하면
-#     06-widget-placed.png / 07-widget-tapped.png 가 실제 그림이다.
+#     스스로 멈추는지 본다. 여기서 실패하면 잡이 빨간불이다.
+#  4. 풀린 위젯 누르기(최선 노력). 2 에서 놓은 위젯이 풀린 모습으로 다시
+#     그려졌는지 찍고, 눌러서 켜지고 다시 눌러 꺼지는지 본다.
 #
 # 앱은 콜드 스타트마다 Play 에 물어 구매 판정을 갱신하는데, Play 에 못 물어본
 # 경우(에뮬레이터가 그렇다) 이전 판정을 유지하므로(lib/flutter_flow/billing_util.dart)
-# 2 단계에서 써 넣은 값은 앱이 지우지 않는다.
+# 3 단계에서 써 넣은 값은 앱이 지우지 않는다.
 
 WIDGET_FAILED=0
 WIDGET_UNLOCKED=0
+WIDGET_PLACED=0
+WIDGET_CENTER=""
 
 # 부모(emulator-capture.sh)는 set -euo pipefail 이다. 여기서는 adb 가 한 번
 # 삐끗하는 것(root 전환 직후 잠깐 offline, grep 무결과 등)으로 잡 전체가 죽지
 # 않게 -e 를 잠시 푼다. 실패는 WIDGET_FAILED 로 모아 마지막에 판정한다.
-# 실제로 2/3 단계에서 명령 하나가 1 을 돌려주자 로그 한 줄 없이 잡이 끝났다.
+# 실제로 명령 하나가 1 을 돌려주자 로그 한 줄 없이 잡이 끝난 적이 있다.
 set +e
 
 widget_log() {
@@ -69,80 +72,11 @@ wait_for_adb() {
   return 1
 }
 
-echo "::group::Widget 1/3: receiver while locked"
-adb shell input keyevent KEYCODE_HOME
-sleep 2
-widget_toggle
-sleep 3
-if [ "$(torch_service_running)" != "0" ]; then
-  widget_log "::error::잠긴 상태의 위젯 토글이 토치 서비스를 띄웠다"
-  WIDGET_FAILED=1
-else
-  widget_log "1/3 잠긴 상태: 토글이 무시됐다 (정상)"
-fi
-echo "::endgroup::"
+# 지금 화면 맨 앞에 있는 창.
+widget_focus() {
+  adb shell dumpsys window 2>/dev/null | grep -m1 'mCurrentFocus=' | tr -d '\r' | sed 's/^ *//'
+}
 
-echo "::group::Widget 2/3: receiver while unlocked (adb root)"
-PREFS_DIR="/data/data/$PACKAGE/shared_prefs"
-PREFS="$PREFS_DIR/FlutterSharedPreferences.xml"
-ROOT_OK=0
-adb root
-adb wait-for-device
-if wait_for_adb && [ "$(adb shell id -u | tr -d '\r')" = "0" ]; then
-  ROOT_OK=1
-fi
-if [ "$ROOT_OK" = "1" ]; then
-  # 앱 데이터 디렉터리의 소유자가 곧 앱 uid 다. dumpsys package 의 userId=
-  # 줄을 긁는 것보다 확실하다(그 방법은 API 36 에서 빈 값을 줬고, chown 을
-  # 건너뛰어 root 소유 파일이 남는 바람에 앱이 구매 캐시를 읽지 못했다).
-  APP_UID="$(adb shell stat -c %u "/data/data/$PACKAGE" | tr -d '\r')"
-  widget_log "2/3 adb root 됨, 앱 uid=${APP_UID:-?}"
-  # 앱 프로세스가 파일을 캐시하고 있으므로 세운 뒤에 쓴다.
-  adb shell am force-stop "$PACKAGE"
-  sleep 2
-  # shared_preferences 플러그인의 파일과 키 형식(WidgetPrefs.kt 참고). 다른 키는
-  # 이 검증에 필요 없으므로 통째로 새로 쓴다.
-  adb shell "mkdir -p '$PREFS_DIR'"
-  adb shell "printf '%s\n' \"<?xml version='1.0' encoding='utf-8' standalone='yes' ?>\" '<map>' '    <boolean name=\"flutter.__ads_removed__\" value=\"true\" />' '</map>' > '$PREFS'"
-  if [ -n "$APP_UID" ]; then
-    adb shell "chown $APP_UID:$APP_UID '$PREFS_DIR' '$PREFS'"
-  fi
-  adb shell "chmod 700 '$PREFS_DIR'; chmod 660 '$PREFS'; restorecon -R '$PREFS_DIR'"
-  adb shell ls -lZ "$PREFS_DIR" | tr -d '\r' | tee -a "$OUT/widget-log.txt"
-  adb shell cat "$PREFS" | tr -d '\r' >"$OUT/widget-prefs.xml"
-  if grep -q '__ads_removed__' "$OUT/widget-prefs.xml"; then
-    WIDGET_UNLOCKED=1
-    widget_log "2/3 구매 캐시를 써 넣었다"
-
-    # 켜기. 앱이 세워져 있으니 리시버가 프로세스를 새로 띄우는, 실제와 같은 경로다.
-    widget_toggle
-    sleep 4
-    if [ "$(torch_service_running)" != "0" ]; then
-      widget_log "2/3 풀린 상태: 토글 -> TorchService 가 떴다 (정상)"
-    else
-      widget_log "::error::풀린 상태의 위젯 토글이 토치 서비스를 띄우지 못했다"
-      WIDGET_FAILED=1
-    fi
-    adb shell dumpsys activity services "$PACKAGE" | tr -d '\r' >"$OUT/widget-service-on.txt"
-
-    # 끄기. 서비스가 콜백으로 꺼진 것을 보고 스스로 멈춰야 한다.
-    widget_toggle
-    sleep 4
-    if [ "$(torch_service_running)" = "0" ]; then
-      widget_log "2/3 풀린 상태: 다시 토글 -> 서비스가 멈췄다 (정상)"
-    else
-      widget_log "::error::토치를 껐는데 TorchService 가 남아 있다"
-      WIDGET_FAILED=1
-    fi
-  else
-    widget_log "::warning::구매 캐시를 쓰지 못했다. 2/3 단계를 건너뛴다."
-  fi
-else
-  widget_log "::warning::adb root 가 안 되는 이미지라 2/3 단계(풀린 위젯)를 건너뛴다."
-fi
-echo "::endgroup::"
-
-echo "::group::Widget 3/3: launcher (drag the large widget onto the home screen)"
 # uiautomator 덤프에서 속성이 일치하는 첫 노드의 중심 좌표 "x y". 없으면 빈 문자열.
 node_center() {
   local attr="$1" value="$2"
@@ -155,21 +89,35 @@ node_center() {
     | awk '{ printf "%d %d", ($1+$3)/2, ($2+$4)/2 }'
 }
 
+echo "::group::Widget 1/4: receiver while locked"
+adb shell input keyevent KEYCODE_HOME
+sleep 2
+widget_toggle
+sleep 3
+if [ "$(torch_service_running)" != "0" ]; then
+  widget_log "::error::잠긴 상태의 위젯 토글이 토치 서비스를 띄웠다"
+  WIDGET_FAILED=1
+else
+  widget_log "1/4 잠긴 상태: 토글이 무시됐다 (정상)"
+fi
+echo "::endgroup::"
+
+echo "::group::Widget 2/4: launcher (drag the large widget onto the home screen, locked)"
 place_widget() {
-  local size center wx wy hx hy
+  local size center wx wy hx hy i label
   size="$(adb shell wm size | tail -1 | tr -d '\r' | sed 's/.*: //')"
   hx=$(( ${size%x*} / 2 ))
   hy=$(( ${size#*x} / 2 ))
 
-  adb shell input keyevent KEYCODE_HOME || true
+  adb shell input keyevent KEYCODE_HOME
   sleep 2
   # 빈 곳을 길게 눌러 홈 화면 메뉴를 연다.
-  adb shell input swipe "$hx" "$hy" "$hx" "$hy" 1500 || true
+  adb shell input swipe "$hx" "$hy" "$hx" "$hy" 1500
   sleep 2
   center="$(node_center text Widgets)"
   if [ -z "$center" ]; then
     widget_log "런처 메뉴에서 'Widgets' 를 찾지 못했다"
-    adb exec-out uiautomator dump /dev/tty 2>/dev/null | tr -d '\r' >"$OUT/widget-dump-home-menu.xml" || true
+    adb exec-out uiautomator dump /dev/tty 2>/dev/null | tr -d '\r' >"$OUT/widget-dump-home-menu.xml"
     return 1
   fi
   # shellcheck disable=SC2086
@@ -185,7 +133,7 @@ place_widget() {
     # shellcheck disable=SC2086
     adb shell input tap $center
     sleep 1
-    adb shell input text "Light" || true
+    adb shell input text "Light"
     sleep 3
   else
     widget_log "위젯 목록의 검색창을 찾지 못했다 -- 스크롤 없이 시도한다"
@@ -196,7 +144,6 @@ place_widget() {
     sleep 1
   fi
   adb exec-out screencap -p >"$OUT/06a-widget-picker.png"
-  adb exec-out uiautomator dump /dev/tty 2>/dev/null | tr -d '\r' >"$OUT/widget-dump-picker.xml"
 
   # 검색 결과는 앱 한 줄로 접혀 있다("Light On - Flashlight" 아래에 위젯 이름이
   # 쉼표로 나열된다). 줄을 눌러 펼쳐야 위젯 미리보기가 나온다.
@@ -214,7 +161,6 @@ place_widget() {
   # 우리 앱의 4×4 위젯. 펼친 목록은 세로로 길어서 Large 는 스크롤해야 보인다.
   # 런처는 미리보기 노드(WidgetCell$2)의 content-desc 에 위젯 라벨을 그대로
   # 쓴다. 몇 번 스크롤해도 안 보이면 눈에 띄는 다른 크기로 대신한다.
-  local i label
   center=""
   for i in 1 2 3 4; do
     center="$(node_center content-desc "Flashlight (Large)")"
@@ -233,69 +179,141 @@ place_widget() {
     adb shell input keyevent KEYCODE_BACK
     return 1
   fi
-  widget_log "3/3 끌어다 놓을 위젯: Flashlight ($label) @ $center"
-  adb exec-out uiautomator dump /dev/tty 2>/dev/null | tr -d '\r' >"$OUT/widget-dump-picker-scrolled.xml"
+  widget_log "2/4 끌어다 놓을 위젯: Flashlight ($label) @ $center"
   wx="${center% *}"
   wy="${center#* }"
   # 길게 눌러 집어서 홈 화면 가운데에 놓는다. draganddrop 이 없는 버전은 swipe 로.
   adb shell input draganddrop "$wx" "$wy" "$hx" "$hy" 1500 2>/dev/null \
-    || adb shell input swipe "$wx" "$wy" "$hx" "$hy" 1500 || true
+    || adb shell input swipe "$wx" "$wy" "$hx" "$hy" 1500
   sleep 4
   # 놓은 직후 뜨는 크기 조절 틀을 없앤다.
-  adb shell input keyevent KEYCODE_BACK || true
+  adb shell input keyevent KEYCODE_BACK
   sleep 1
   return 0
 }
 
 if place_widget; then
-  adb exec-out screencap -p >"$OUT/06-widget-placed.png"
-  widget_log "3/3 위젯을 놓았다: 06-widget-placed.png"
+  WIDGET_CENTER="$(node_center resource-id "$PACKAGE:id/widget_root")"
+  if [ -n "$WIDGET_CENTER" ]; then
+    WIDGET_PLACED=1
+    adb exec-out screencap -p >"$OUT/06-widget-placed-locked.png"
+    widget_log "2/4 위젯을 놓았다(잠김): 06-widget-placed-locked.png"
 
-  center="$(node_center resource-id "$PACKAGE:id/widget_root")"
-  if [ -n "$center" ]; then
+    # 잠긴 위젯을 누르면 앱이 결제 시트를 연 채로 떠야 한다.
     # shellcheck disable=SC2086
-    adb shell input tap $center
-    sleep 5
-    adb exec-out screencap -p >"$OUT/07-widget-tapped.png"
-    focus="$(adb shell dumpsys window 2>/dev/null | grep -m1 'mCurrentFocus=' | tr -d '\r')"
-    widget_log "3/3 위젯을 눌렀다: 07-widget-tapped.png, 포커스: $focus"
-    if [ "$WIDGET_UNLOCKED" = "1" ]; then
-      # 풀린 위젯: 앱을 띄우지 않고 켜져야 한다.
-      if [ "$(torch_service_running)" != "0" ]; then
-        widget_log "3/3 풀린 위젯 탭 -> 켜짐, 서비스 떠 있음 (정상)"
-      else
-        widget_log "::warning::풀린 위젯을 눌렀는데 토치 서비스가 뜨지 않았다"
-      fi
-      # 다시 눌러 끈다.
-      # shellcheck disable=SC2086
-      adb shell input tap $center
-      sleep 4
-      adb exec-out screencap -p >"$OUT/08-widget-tapped-again.png"
-      if [ "$(torch_service_running)" = "0" ]; then
-        widget_log "3/3 다시 탭 -> 꺼짐, 서비스 멈춤 (정상)"
-      else
-        widget_log "::warning::다시 눌렀는데 토치 서비스가 남아 있다"
-      fi
-    else
-      # 잠긴 위젯: 앱이 결제 시트를 연 채로 떠야 한다.
-      case "$focus" in
-        *"$PACKAGE"*) widget_log "3/3 잠긴 위젯 탭 -> 앱이 떴다 (정상)" ;;
-        *) widget_log "::warning::잠긴 위젯을 눌렀는데 앱이 앞에 오지 않았다" ;;
-      esac
-    fi
+    adb shell input tap $WIDGET_CENTER
+    sleep 6
+    adb exec-out screencap -p >"$OUT/07-locked-widget-tapped.png"
+    focus="$(widget_focus)"
+    case "$focus" in
+      *"$PACKAGE"*) widget_log "2/4 잠긴 위젯 탭 -> 앱이 떴다 (정상): 07-locked-widget-tapped.png" ;;
+      *) widget_log "::warning::잠긴 위젯을 눌렀는데 앱이 앞에 오지 않았다: $focus" ;;
+    esac
+    adb shell input keyevent KEYCODE_HOME
+    sleep 2
   else
-    widget_log "::warning::홈 화면에서 위젯 루트(widget_root)를 찾지 못해 누르지 못했다"
-    adb exec-out uiautomator dump /dev/tty 2>/dev/null | tr -d '\r' >"$OUT/widget-dump-home.xml" || true
+    widget_log "::warning::홈 화면에서 위젯 루트(widget_root)를 찾지 못했다"
+    adb exec-out screencap -p >"$OUT/06-widget-placement-failed.png"
+    adb exec-out uiautomator dump /dev/tty 2>/dev/null | tr -d '\r' >"$OUT/widget-dump-home.xml"
   fi
 else
   widget_log "::warning::런처 UI 자동화로 위젯을 놓지 못했다. 리시버 단계 결과만 유효하다."
-  adb exec-out screencap -p >"$OUT/06-widget-placement-failed.png" || true
+  adb exec-out screencap -p >"$OUT/06-widget-placement-failed.png"
+fi
+echo "::endgroup::"
+
+echo "::group::Widget 3/4: receiver while unlocked (adb root)"
+PREFS_DIR="/data/data/$PACKAGE/shared_prefs"
+PREFS="$PREFS_DIR/FlutterSharedPreferences.xml"
+ROOT_OK=0
+adb root
+adb wait-for-device
+if wait_for_adb && [ "$(adb shell id -u | tr -d '\r')" = "0" ]; then
+  ROOT_OK=1
+fi
+if [ "$ROOT_OK" = "1" ]; then
+  # 앱 데이터 디렉터리의 소유자가 곧 앱 uid 다. dumpsys package 의 userId=
+  # 줄을 긁는 것보다 확실하다(그 방법은 API 36 에서 빈 값을 줬고, chown 을
+  # 건너뛰어 root 소유 파일이 남는 바람에 앱이 구매 캐시를 읽지 못했다).
+  APP_UID="$(adb shell stat -c %u "/data/data/$PACKAGE" | tr -d '\r')"
+  widget_log "3/4 adb root 됨, 앱 uid=${APP_UID:-?}"
+  # 앱 프로세스가 파일을 캐시하고 있으므로 세운 뒤에 쓴다.
+  adb shell am force-stop "$PACKAGE"
+  sleep 2
+  # shared_preferences 플러그인의 파일과 키 형식(WidgetPrefs.kt 참고). 다른 키는
+  # 이 검증에 필요 없으므로 통째로 새로 쓴다.
+  adb shell "mkdir -p '$PREFS_DIR'"
+  adb shell "printf '%s\n' \"<?xml version='1.0' encoding='utf-8' standalone='yes' ?>\" '<map>' '    <boolean name=\"flutter.__ads_removed__\" value=\"true\" />' '</map>' > '$PREFS'"
+  if [ -n "$APP_UID" ]; then
+    adb shell "chown $APP_UID:$APP_UID '$PREFS_DIR' '$PREFS'"
+  fi
+  adb shell "chmod 700 '$PREFS_DIR'; chmod 660 '$PREFS'; restorecon -R '$PREFS_DIR'"
+  adb shell ls -lZ "$PREFS" | tr -d '\r' | tee -a "$OUT/widget-log.txt"
+  adb shell cat "$PREFS" | tr -d '\r' >"$OUT/widget-prefs.xml"
+  if grep -q '__ads_removed__' "$OUT/widget-prefs.xml"; then
+    WIDGET_UNLOCKED=1
+    widget_log "3/4 구매 캐시를 써 넣었다"
+
+    # 켜기. 앱이 세워져 있으니 리시버가 프로세스를 새로 띄우는, 실제와 같은 경로다.
+    widget_toggle
+    sleep 4
+    if [ "$(torch_service_running)" != "0" ]; then
+      widget_log "3/4 풀린 상태: 토글 -> TorchService 가 떴다 (정상)"
+    else
+      widget_log "::error::풀린 상태의 위젯 토글이 토치 서비스를 띄우지 못했다"
+      WIDGET_FAILED=1
+    fi
+    adb shell dumpsys activity services "$PACKAGE" | tr -d '\r' >"$OUT/widget-service-on.txt"
+
+    # 끄기. 서비스가 콜백으로 꺼진 것을 보고 스스로 멈춰야 한다.
+    widget_toggle
+    sleep 4
+    if [ "$(torch_service_running)" = "0" ]; then
+      widget_log "3/4 풀린 상태: 다시 토글 -> 서비스가 멈췄다 (정상)"
+    else
+      widget_log "::error::토치를 껐는데 TorchService 가 남아 있다"
+      WIDGET_FAILED=1
+    fi
+  else
+    widget_log "::warning::구매 캐시를 쓰지 못했다. 3/4 단계를 건너뛴다."
+  fi
+else
+  widget_log "::warning::adb root 가 안 되는 이미지라 3/4 단계(풀린 위젯)를 건너뛴다."
+fi
+echo "::endgroup::"
+
+echo "::group::Widget 4/4: tap the unlocked widget on the home screen"
+if [ "$WIDGET_PLACED" = "1" ] && [ "$WIDGET_UNLOCKED" = "1" ]; then
+  adb shell input keyevent KEYCODE_HOME
+  sleep 2
+  # 3/4 의 토글 브로드캐스트가 위젯을 다시 그렸으므로 이제 풀린 모습이어야 한다.
+  adb exec-out screencap -p >"$OUT/08-widget-unlocked.png"
+  # shellcheck disable=SC2086
+  adb shell input tap $WIDGET_CENTER
+  sleep 5
+  adb exec-out screencap -p >"$OUT/09-widget-on.png"
+  if [ "$(torch_service_running)" != "0" ]; then
+    widget_log "4/4 풀린 위젯 탭 -> 켜짐, 서비스 떠 있음 (정상): 09-widget-on.png"
+  else
+    widget_log "::warning::풀린 위젯을 눌렀는데 토치 서비스가 뜨지 않았다"
+  fi
+  # shellcheck disable=SC2086
+  adb shell input tap $WIDGET_CENTER
+  sleep 4
+  adb exec-out screencap -p >"$OUT/10-widget-off.png"
+  if [ "$(torch_service_running)" = "0" ]; then
+    widget_log "4/4 다시 탭 -> 꺼짐, 서비스 멈춤 (정상): 10-widget-off.png"
+  else
+    widget_log "::warning::다시 눌렀는데 토치 서비스가 남아 있다"
+  fi
+else
+  widget_log "4/4 건너뜀 (위젯 놓기 $WIDGET_PLACED, 구매 캐시 $WIDGET_UNLOCKED)"
 fi
 echo "::endgroup::"
 
 echo "::group::Widget: logs"
-adb logcat -d -v time -s LightOnTorch:V >"$OUT/logcat-widget.txt" || true
-cat "$OUT/logcat-widget.txt" || true
+adb logcat -d -v time -s LightOnTorch:V >"$OUT/logcat-widget.txt"
+cat "$OUT/logcat-widget.txt"
 echo "::endgroup::"
 
 # 부모의 set -e 를 되돌린다.
