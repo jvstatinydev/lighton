@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- 홈 화면 위젯 색. 앱의 FlutterFlowTheme(lib/flutter_flow/flutter_flow_theme.dart)
      밝은 테마와 같은 값이다. 어두운 테마는 values-night/colors.xml. 위젯은 앱이 아니라
-     시스템의 다크 모드를 따른다 -- 앱 안에서 고른 테마는 Flutter 만 안다. -->
+     시스템의 다크 모드를 따른다 - 앱 안에서 고른 테마는 Flutter 만 안다. -->
 <resources>
     <!-- secondaryBackground -->
     <color name="widget_background">#FFFFFFFF</color>

@@ -178,6 +178,32 @@ void main() {
     }
   });
 
+  group('XML 주석', () {
+    // aapt 는 주석 안의 "--" 를 거부한다(XML 규격). 이 저장소의 한국어 주석은
+    // 줄표로 "--" 를 즐겨 쓰므로 리소스 XML 에 옮겨 적다가 그대로 들어가기
+    // 쉽다. 빌드가 통째로 깨지고, 로컬에는 툴체인이 없어 여기서 먼저 잡는다.
+    test('안드로이드 리소스 주석에 "--" 가 없다', () {
+      final List<File> files = <File>[
+        File('android/app/src/main/AndroidManifest.xml'),
+        ...Directory(res)
+            .listSync(recursive: true)
+            .whereType<File>()
+            .where((File f) => f.path.endsWith('.xml')),
+      ];
+      for (final File f in files) {
+        for (final RegExpMatch m in RegExp(
+          r'<!--([\s\S]*?)-->',
+        ).allMatches(f.readAsStringSync())) {
+          expect(
+            m.group(1),
+            isNot(contains('--')),
+            reason: '${f.path} 의 주석 안에 "--" 가 있다',
+          );
+        }
+      }
+    });
+  });
+
   group('색과 드로어블', () {
     test('어두운 테마 색은 밝은 테마와 같은 이름을 전부 가진다', () {
       Iterable<String> names(String path) => RegExp(r'<color name="(\w+)"')
