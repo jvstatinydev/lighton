@@ -5,8 +5,13 @@ import '/flutter_flow/flutter_flow_language_selector.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
+import '/flutter_flow/home_widget_util.dart'
+    show
+        WidgetLaunchAction,
+        consumeWidgetLaunchAction,
+        pendingWidgetLaunchAction;
 import '/flutter_flow/remove_ads_promo.dart'
-    show RemoveAdsButton, kInlineRemoveAdsMinWidth;
+    show RemoveAdsButton, kInlineRemoveAdsMinWidth, showRemoveAdsSheet;
 import '/flutter_flow/screen_light_notice.dart'
     show showScreenLightNoticeOnce;
 import '/flutter_flow/screen_light_util.dart' show setKeepAwake;
@@ -49,6 +54,10 @@ class _HomePageWidgetState extends State<HomePageWidget>
     // 불이 꺼져 있어도 마찬가지다. 다시 켜려고 잠금을 풀고 앱을 찾아 들어오는
     // 과정이 부담인 분들이 있다.
     setKeepAwake(true);
+
+    // 앱이 떠 있는 채로 홈 화면 위젯이 눌리면 네이티브가 여기로 밀어 넣는다.
+    // 콜드 스타트 쪽은 아래 페이지 로드 끝에서 가져간다.
+    pendingWidgetLaunchAction.addListener(_onPendingWidgetLaunchAction);
 
     // On page load action.
     SchedulerBinding.instance.addPostFrameCallback((_) async {
@@ -99,6 +108,11 @@ class _HomePageWidgetState extends State<HomePageWidget>
 
       FFAppState().isFlashOn = !FFAppState().isFlashOn;
       safeSetState(() {});
+
+      // 홈 화면 위젯이 앱을 띄운 것이라면 넘겨받은 동작을 한다. 위의 상태
+      // 읽기와 애니메이션이 끝난 뒤여야 한다 -- 결제 시트가 그 위에 뜨거나
+      // 화면 조명 토글이 초기 상태 읽기와 엇갈리면 안 된다.
+      await _handleWidgetLaunchAction(await consumeWidgetLaunchAction());
     });
 
     animationsMap.addAll({
@@ -152,12 +166,44 @@ class _HomePageWidgetState extends State<HomePageWidget>
 
   @override
   void dispose() {
+    pendingWidgetLaunchAction.removeListener(_onPendingWidgetLaunchAction);
     // 화면을 떠나면 원래대로 되돌린다. 창 단위 플래그라 앱이 백그라운드로
     // 가면 어차피 풀리지만, 명시적으로 정리해 둔다.
     setKeepAwake(false);
     _model.dispose();
 
     super.dispose();
+  }
+
+  void _onPendingWidgetLaunchAction() {
+    final WidgetLaunchAction action = pendingWidgetLaunchAction.value;
+    if (action == WidgetLaunchAction.none) {
+      return;
+    }
+    pendingWidgetLaunchAction.value = WidgetLaunchAction.none;
+    // 네이티브도 같은 동작을 들고 있다. 여기서 처리했으니 지워서 다음 페이지
+    // 로드가 또 하지 않게 한다.
+    consumeWidgetLaunchAction();
+    _handleWidgetLaunchAction(action);
+  }
+
+  /// 홈 화면 위젯이 앱을 띄우며 넘긴 동작(lib/flutter_flow/home_widget_util.dart).
+  Future<void> _handleWidgetLaunchAction(WidgetLaunchAction action) async {
+    if (!mounted) {
+      return;
+    }
+    switch (action) {
+      case WidgetLaunchAction.none:
+        return;
+      case WidgetLaunchAction.removeAds:
+        // 잠긴 위젯을 눌렀다. 무엇을 사면 풀리는지 보여준다. 이미 산 사람이
+        // 캐시가 없어 잠긴 위젯을 봤다면, 시트가 결제 준비를 마치고 성공
+        // 화면으로 바뀌면서 위젯도 풀린다.
+        await showRemoveAdsSheet(context);
+      case WidgetLaunchAction.toggle:
+        // 플래시가 없는 기기. 위젯은 화면을 밝힐 수 없어 앱이 대신 한다.
+        await action_blocks.toggleFlashlightThenUpdateState(context);
+    }
   }
 
   @override

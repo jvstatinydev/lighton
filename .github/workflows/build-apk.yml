@@ -68,7 +68,9 @@ jobs:
             test/torch_util_test.dart \
             test/screen_light_test.dart \
             test/edge_to_edge_test.dart \
-            test/android_build_config_test.dart
+            test/android_build_config_test.dart \
+            test/home_widget_test.dart \
+            test/home_widget_config_test.dart
 
       - name: Build release APK
         run: flutter build apk --release

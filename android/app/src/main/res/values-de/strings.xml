@@ -1,4 +1,21 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <resources>
     <string name="app_name">Licht an - Taschenlampe</string>
+
+    <!-- 홈 화면 위젯과 토치 알림 (TorchWidgetProvider.kt, TorchService.kt).
+         모든 values-XX 에 같은 이름이 있어야 한다. test/home_widget_config_test.dart 가 지킨다. -->
+    <string name="widget_flashlight">Taschenlampe</string>
+    <string name="widget_on">An</string>
+    <string name="widget_off">Aus</string>
+    <string name="widget_label_1x1">Taschenlampe (Klein)</string>
+    <string name="widget_label_2x2">Taschenlampe (Mittel)</string>
+    <string name="widget_label_4x2">Taschenlampe (Breit)</string>
+    <string name="widget_label_4x4">Taschenlampe (Groß)</string>
+    <string name="widget_description">Taschenlampe direkt vom Startbildschirm ein- und ausschalten.</string>
+    <string name="widget_locked_title">Gesperrt</string>
+    <string name="widget_locked_hint">Mit „Werbung entfernen“ freischalten</string>
+    <string name="widget_owner_hint">Schon gekauft? App öffnen.</string>
+    <string name="torch_notification_channel">Taschenlampe</string>
+    <string name="torch_notification_title">Taschenlampe ist an</string>
+    <string name="torch_notification_text">Zum Ausschalten tippen</string>
 </resources>

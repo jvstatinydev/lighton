@@ -8,6 +8,7 @@ import 'package:in_app_purchase_platform_interface/in_app_purchase_platform_inte
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../app_state.dart';
+import 'home_widget_util.dart' show refreshHomeWidgets;
 
 export 'package:in_app_purchase/in_app_purchase.dart' show ProductDetails;
 
@@ -398,6 +399,10 @@ void _setEntitlement(bool value) {
   FFAppState().update(() {
     FFAppState().adsRemoved = value;
   });
+  // 홈 화면 위젯은 이 값을 shared_preferences 에서 직접 읽어 잠금을 푼다.
+  // 값이 바뀌었으니 다시 그리게 한다. 구매 직후 홈으로 나갔을 때 위젯이
+  // 여전히 잠겨 있으면 산 것이 맞나 의심하게 된다.
+  unawaited(refreshHomeWidgets());
 }
 
 void _update({

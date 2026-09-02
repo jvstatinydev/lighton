@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 홈 화면 위젯 색, 어두운 테마. values/colors.xml 참고. -->
+<resources>
+    <color name="widget_background">#FF14181B</color>
+    <color name="widget_button_off">#FF262D34</color>
+    <color name="widget_button_on">#FF38B6A8</color>
+    <color name="widget_text_off">#FFFFFFFF</color>
+    <color name="widget_text_on">#FFFFFFFF</color>
+    <color name="widget_text_secondary">#FF95A1AC</color>
+</resources>

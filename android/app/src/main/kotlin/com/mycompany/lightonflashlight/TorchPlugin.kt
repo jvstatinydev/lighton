@@ -31,30 +31,17 @@ class TorchPlugin(private val context: Context) : MethodChannel.MethodCallHandle
         get() = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
 
     /**
-     * 토치의 실제 상태. 시스템이 알려주는 값이라 다른 앱이 껐을 때도 따라간다.
+     * 토치의 실제 상태는 프로세스 공용 [TorchMonitor] 가 안다. 시스템이 알려주는
+     * 값이라 다른 앱이 껐을 때도 따라간다.
      *
      * 플러그인은 자기 메모리의 Boolean 하나로 상태를 기억했기 때문에, 밖에서
-     * 토치가 꺼지면 앱의 버튼 표시와 실제가 어긋났다.
+     * 토치가 꺼지면 앱의 버튼 표시와 실제가 어긋났다. 예전에는 이 클래스가
+     * 콜백을 직접 들고 있었는데, 홈 화면 위젯도 같은 상태를 봐야 해서
+     * TorchMonitor 로 옮겼다. 등록은 LightOnApplication 이 프로세스 시작 시에
+     * 하고, 여기서는 혹시 몰라 한 번 더 보장만 한다.
      */
-    private val torchOn = mutableMapOf<String, Boolean>()
-    private var callbackRegistered = false
-
-    private val torchCallback = object : CameraManager.TorchCallback() {
-        override fun onTorchModeChanged(cameraId: String, enabled: Boolean) {
-            torchOn[cameraId] = enabled
-        }
-
-        override fun onTorchModeUnavailable(cameraId: String) {
-            torchOn[cameraId] = false
-        }
-    }
-
-    /** 콜백 등록은 한 번만. handler 가 null 이면 현재 스레드의 looper 를 쓴다. */
     private fun ensureTorchCallback() {
-        if (!callbackRegistered) {
-            cameraManager.registerTorchCallback(torchCallback, null)
-            callbackRegistered = true
-        }
+        TorchMonitor.ensureRegistered(context)
     }
 
     fun register(messenger: BinaryMessenger) {
@@ -116,7 +103,7 @@ class TorchPlugin(private val context: Context) : MethodChannel.MethodCallHandle
         }
         try {
             ensureTorchCallback()
-            result.success(torchOn[cameraId] ?: false)
+            result.success(TorchMonitor.isOn(cameraId))
         } catch (e: Throwable) {
             result.error("TORCH_STATE_FAILED", e.toString(), cameraId)
         }

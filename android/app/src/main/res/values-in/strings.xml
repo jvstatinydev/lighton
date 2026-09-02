@@ -1,4 +1,21 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <resources>
     <string name="app_name">Lampu menyala - Senter</string>
+
+    <!-- 홈 화면 위젯과 토치 알림 (TorchWidgetProvider.kt, TorchService.kt).
+         모든 values-XX 에 같은 이름이 있어야 한다. test/home_widget_config_test.dart 가 지킨다. -->
+    <string name="widget_flashlight">Senter</string>
+    <string name="widget_on">Nyala</string>
+    <string name="widget_off">Mati</string>
+    <string name="widget_label_1x1">Senter (Kecil)</string>
+    <string name="widget_label_2x2">Senter (Sedang)</string>
+    <string name="widget_label_4x2">Senter (Lebar)</string>
+    <string name="widget_label_4x4">Senter (Besar)</string>
+    <string name="widget_description">Nyalakan dan matikan senter dari layar utama.</string>
+    <string name="widget_locked_title">Terkunci</string>
+    <string name="widget_locked_hint">Buka dengan Hapus iklan</string>
+    <string name="widget_owner_hint">Sudah beli? Buka aplikasinya.</string>
+    <string name="torch_notification_channel">Senter</string>
+    <string name="torch_notification_title">Senter menyala</string>
+    <string name="torch_notification_text">Ketuk untuk mematikan</string>
 </resources>

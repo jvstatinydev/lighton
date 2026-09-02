@@ -1,4 +1,21 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <resources>
     <string name="app_name">Фонарик</string>
+
+    <!-- 홈 화면 위젯과 토치 알림 (TorchWidgetProvider.kt, TorchService.kt).
+         모든 values-XX 에 같은 이름이 있어야 한다. test/home_widget_config_test.dart 가 지킨다. -->
+    <string name="widget_flashlight">Фонарик</string>
+    <string name="widget_on">Вкл.</string>
+    <string name="widget_off">Выкл.</string>
+    <string name="widget_label_1x1">Фонарик (Маленький)</string>
+    <string name="widget_label_2x2">Фонарик (Средний)</string>
+    <string name="widget_label_4x2">Фонарик (Широкий)</string>
+    <string name="widget_label_4x4">Фонарик (Большой)</string>
+    <string name="widget_description">Включайте и выключайте фонарик с главного экрана.</string>
+    <string name="widget_locked_title">Заблокировано</string>
+    <string name="widget_locked_hint">Откройте через «Убрать рекламу»</string>
+    <string name="widget_owner_hint">Уже купили? Откройте приложение.</string>
+    <string name="torch_notification_channel">Фонарик</string>
+    <string name="torch_notification_title">Фонарик включён</string>
+    <string name="torch_notification_text">Нажмите, чтобы выключить</string>
 </resources>

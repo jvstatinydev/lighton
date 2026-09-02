@@ -1,4 +1,21 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <resources>
     <string name="app_name">ضوء مضاء - مصباح يدوي كشاف</string>
+
+    <!-- 홈 화면 위젯과 토치 알림 (TorchWidgetProvider.kt, TorchService.kt).
+         모든 values-XX 에 같은 이름이 있어야 한다. test/home_widget_config_test.dart 가 지킨다. -->
+    <string name="widget_flashlight">المصباح</string>
+    <string name="widget_on">يعمل</string>
+    <string name="widget_off">متوقف</string>
+    <string name="widget_label_1x1">المصباح (صغير)</string>
+    <string name="widget_label_2x2">المصباح (متوسط)</string>
+    <string name="widget_label_4x2">المصباح (عريض)</string>
+    <string name="widget_label_4x4">المصباح (كبير)</string>
+    <string name="widget_description">شغّل المصباح وأطفئه من الشاشة الرئيسية.</string>
+    <string name="widget_locked_title">مقفل</string>
+    <string name="widget_locked_hint">افتح القفل عبر إزالة الإعلانات</string>
+    <string name="widget_owner_hint">اشتريت بالفعل؟ افتح التطبيق.</string>
+    <string name="torch_notification_channel">المصباح</string>
+    <string name="torch_notification_title">المصباح مضاء</string>
+    <string name="torch_notification_text">انقر للإيقاف</string>
 </resources>

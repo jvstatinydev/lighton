@@ -131,7 +131,7 @@ jobs:
       # 여기서 막는다. 사이드로드용 build-apk.yml 은 조사용 빌드를 만드는
       # 통로이므로 같은 검사를 걸지 않는다.
       - name: Test
-        run: flutter test test/torch_util_test.dart test/screen_light_test.dart test/release_guard_test.dart test/android_build_config_test.dart
+        run: flutter test test/torch_util_test.dart test/screen_light_test.dart test/release_guard_test.dart test/android_build_config_test.dart test/home_widget_test.dart test/home_widget_config_test.dart
 
       - name: Build release AAB
         env:

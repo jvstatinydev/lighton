@@ -1,4 +1,21 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <resources>
     <string name="app_name">टॉर्च</string>
+
+    <!-- 홈 화면 위젯과 토치 알림 (TorchWidgetProvider.kt, TorchService.kt).
+         모든 values-XX 에 같은 이름이 있어야 한다. test/home_widget_config_test.dart 가 지킨다. -->
+    <string name="widget_flashlight">टॉर्च</string>
+    <string name="widget_on">चालू</string>
+    <string name="widget_off">बंद</string>
+    <string name="widget_label_1x1">टॉर्च (छोटा)</string>
+    <string name="widget_label_2x2">टॉर्च (मध्यम)</string>
+    <string name="widget_label_4x2">टॉर्च (चौड़ा)</string>
+    <string name="widget_label_4x4">टॉर्च (बड़ा)</string>
+    <string name="widget_description">होम स्क्रीन से टॉर्च चालू और बंद करें।</string>
+    <string name="widget_locked_title">लॉक है</string>
+    <string name="widget_locked_hint">विज्ञापन हटाएं से अनलॉक करें</string>
+    <string name="widget_owner_hint">पहले ही खरीदा है? ऐप खोलें।</string>
+    <string name="torch_notification_channel">टॉर्च</string>
+    <string name="torch_notification_title">टॉर्च चालू है</string>
+    <string name="torch_notification_text">बंद करने के लिए टैप करें</string>
 </resources>

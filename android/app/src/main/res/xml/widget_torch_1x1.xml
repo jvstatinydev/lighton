@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  1×1 손전등 위젯. 로직은 TorchWidgetProvider.kt, 그림은 layout/widget_torch_1x1.xml.
+
+  minWidth/minHeight 는 칸 수를 dp 로 바꾼 것(70 × 칸 − 30). Android 12 부터는
+  targetCellWidth/Height 가 우선하고 그 아래 버전은 dp 값으로 칸 수를 정한다.
+  둘 다 적어 어느 버전에서든 이 크기 그대로 놓이게 한다.
+
+  resizeMode 는 남겨 둔다. 크기별 항목이 따로 있으니 조절은 선택이고, 최소는
+  1×1 까지 줄일 수 있게 한다.
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="40dp"
+    android:minHeight="40dp"
+    android:targetCellWidth="1"
+    android:targetCellHeight="1"
+    android:minResizeWidth="40dp"
+    android:minResizeHeight="40dp"
+    android:resizeMode="horizontal|vertical"
+    android:initialLayout="@layout/widget_torch_1x1"
+    android:previewLayout="@layout/widget_torch_1x1"
+    android:description="@string/widget_description"
+    android:widgetCategory="home_screen"
+    android:updatePeriodMillis="0" />

@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 생성된 파일이 아니다. 손으로 고친다. id 집합은 네 레이아웃이 같아야 한다
+     (TorchWidgetProvider.kt 참고). -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="0dp">
+
+    <!-- 켜짐/꺼짐. 잠금이 풀렸을 때만 보인다. -->
+    <LinearLayout
+        android:id="@+id/widget_torch"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/widget_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp"
+            android:paddingBottom="12dp"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:textColor="@color/widget_text_off"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
+        <LinearLayout
+            android:id="@+id/widget_button"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:background="@drawable/widget_button_off"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:padding="6dp">
+
+            <ImageView
+                android:id="@+id/widget_icon"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:importantForAccessibility="no"
+                android:src="@drawable/ic_widget_torch" />
+
+            <TextView
+                android:id="@+id/widget_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:textColor="@color/widget_text_off"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:visibility="visible" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- 잠김. "광고 제거" 를 사기 전. 탭하면 앱이 결제 시트를 연다. -->
+    <LinearLayout
+        android:id="@+id/widget_locked"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/widget_background"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="6dp"
+        android:visibility="gone">
+
+        <ImageView
+            android:id="@+id/widget_lock_icon"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:importantForAccessibility="no"
+            android:src="@drawable/ic_widget_lock"
+            android:tint="@color/widget_text_secondary" />
+
+        <TextView
+            android:id="@+id/widget_locked_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:textColor="@color/widget_text_off"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:visibility="visible" />
+
+        <TextView
+            android:id="@+id/widget_locked_hint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:gravity="center"
+            android:maxLines="2"
+            android:ellipsize="end"
+            android:textColor="@color/widget_text_off"
+            android:textSize="11sp"
+            android:visibility="visible" />
+
+        <TextView
+            android:id="@+id/widget_owner_hint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:gravity="center"
+            android:maxLines="2"
+            android:ellipsize="end"
+            android:textColor="@color/widget_text_secondary"
+            android:textSize="13sp"
+            android:visibility="gone" />
+    </LinearLayout>
+</FrameLayout>

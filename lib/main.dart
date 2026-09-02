@@ -9,6 +9,8 @@ import 'package:flutter_web_plugins/url_strategy.dart';
 import '/flutter_flow/admob_util.dart' show ensureAdMobReady;
 import '/flutter_flow/billing_util.dart' show ensureBillingReady;
 import '/flutter_flow/flutter_flow_theme.dart';
+import '/flutter_flow/home_widget_util.dart'
+    show initHomeWidgetChannel, refreshHomeWidgets;
 import 'flutter_flow/flutter_flow_util.dart';
 import 'flutter_flow/internationalization.dart';
 
@@ -64,6 +66,12 @@ void main() async {
   // 조회가 끝나면 FFAppState 가 알려서 다시 그려진다.
   unawaited(ensureBillingReady());
 
+  // 홈 화면 위젯. 위젯이 앱을 띄우며 넘긴 동작을 받을 채널을 열고, 놓여 있는
+  // 위젯을 한 번 다시 그리게 한다. 저장된 구매 상태나 언어가 위젯이 마지막으로
+  // 그려진 뒤 바뀌었을 수 있다. 기다리지 않는다 -- 위젯은 손전등이 아니다.
+  initHomeWidgetChannel();
+  unawaited(refreshHomeWidgets());
+
   runApp(ChangeNotifierProvider(
     create: (context) => appState,
     child: MyApp(),
@@ -113,6 +121,9 @@ class _MyAppState extends State<MyApp> {
   void setLocale(String language) {
     safeSetState(() => _locale = createLocale(language));
     FFLocalizations.storeLocale(language);
+    // 홈 화면 위젯도 앱에서 고른 언어를 따른다(WidgetPrefs.kt). 저장이 끝난
+    // 뒤에 다시 그려야 새 언어로 나온다.
+    unawaited(refreshHomeWidgets());
   }
 
   void setThemeMode(ThemeMode mode) => safeSetState(() {

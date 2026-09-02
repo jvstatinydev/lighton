@@ -214,6 +214,11 @@ sleep 5
 adb exec-out screencap -p >"$OUT/05-after-tap.png"
 echo "::endgroup::"
 
+# 홈 화면 위젯. 리시버 단계는 확정적이고 런처 단계는 최선 노력이다.
+# 자세한 것은 그 파일 머리말에.
+# shellcheck disable=SC1091
+source .github/scripts/emulator-widget.sh
+
 echo "::group::Collect logs"
 # 전체 로그. 네이티브 크래시나 플러그인 경고는 flutter 태그 밖에서 나온다.
 adb logcat -d -v time >"$OUT/logcat-full.txt"
@@ -246,6 +251,11 @@ cat "$OUT/insets.txt" || true
 # 회전이 한 번이라도 요청대로 안 됐으면 잡을 떨어뜨린다. 아티팩트 업로드는
 # `if: always()` 라 그대로 올라가므로, 찍힌 것은 다 보면서 "가로를 봤다" 는
 # 착각만 막는다.
+if [ "${WIDGET_FAILED:-0}" -ne 0 ]; then
+  echo "::error::홈 화면 위젯 검증이 실패했습니다. widget-log.txt 를 보세요."
+  exit 1
+fi
+
 if [ "$ROTATE_FAILED" -ne 0 ]; then
   echo "::error::요청한 방향으로 돌지 않은 캡처가 있습니다. rotation-log.txt 를 보세요."
   exit 1

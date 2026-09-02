@@ -1,4 +1,21 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <resources>
     <string name="app_name">Luz encendida - Linterna</string>
+
+    <!-- 홈 화면 위젯과 토치 알림 (TorchWidgetProvider.kt, TorchService.kt).
+         모든 values-XX 에 같은 이름이 있어야 한다. test/home_widget_config_test.dart 가 지킨다. -->
+    <string name="widget_flashlight">Linterna</string>
+    <string name="widget_on">Encendida</string>
+    <string name="widget_off">Apagada</string>
+    <string name="widget_label_1x1">Linterna (Pequeño)</string>
+    <string name="widget_label_2x2">Linterna (Mediano)</string>
+    <string name="widget_label_4x2">Linterna (Ancho)</string>
+    <string name="widget_label_4x4">Linterna (Grande)</string>
+    <string name="widget_description">Enciende y apaga la linterna desde la pantalla de inicio.</string>
+    <string name="widget_locked_title">Bloqueado</string>
+    <string name="widget_locked_hint">Desbloquea con Quitar anuncios</string>
+    <string name="widget_owner_hint">¿Ya lo compraste? Abre la app.</string>
+    <string name="torch_notification_channel">Linterna</string>
+    <string name="torch_notification_title">La linterna está encendida</string>
+    <string name="torch_notification_text">Toca para apagar</string>
 </resources>
