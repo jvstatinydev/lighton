@@ -25,6 +25,12 @@
 WIDGET_FAILED=0
 WIDGET_UNLOCKED=0
 
+# 부모(emulator-capture.sh)는 set -euo pipefail 이다. 여기서는 adb 가 한 번
+# 삐끗하는 것(root 전환 직후 잠깐 offline, grep 무결과 등)으로 잡 전체가 죽지
+# 않게 -e 를 잠시 푼다. 실패는 WIDGET_FAILED 로 모아 마지막에 판정한다.
+# 실제로 2/3 단계에서 명령 하나가 1 을 돌려주자 로그 한 줄 없이 잡이 끝났다.
+set +e
+
 widget_log() {
   echo "$*" | tee -a "$OUT/widget-log.txt"
 }
@@ -32,17 +38,29 @@ widget_log() {
 # 서비스가 떠 있는지. 0 이면 안 떠 있는 것이다.
 torch_service_running() {
   adb shell dumpsys activity services "$PACKAGE" 2>/dev/null \
-    | grep -c "TorchService" || true
+    | grep -c "TorchService"
 }
 
 # 위젯 탭과 같은 브로드캐스트.
 widget_toggle() {
   adb shell am broadcast -a com.mycompany.lightonflashlight.action.WIDGET_TOGGLE \
-    -n "$PACKAGE/.TorchWidget4x4" | tr -d '\r' | tee -a "$OUT/widget-log.txt" || true
+    -n "$PACKAGE/.TorchWidget4x4" | tr -d '\r' | tee -a "$OUT/widget-log.txt"
+}
+
+# adb 가 다시 응답할 때까지 기다린다(root 전환 뒤 adbd 가 재시작된다).
+wait_for_adb() {
+  local i
+  for i in $(seq 1 20); do
+    if adb shell true >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 1
+  done
+  return 1
 }
 
 echo "::group::Widget 1/3: receiver while locked"
-adb shell input keyevent KEYCODE_HOME || true
+adb shell input keyevent KEYCODE_HOME
 sleep 2
 widget_toggle
 sleep 3
@@ -57,23 +75,30 @@ echo "::endgroup::"
 echo "::group::Widget 2/3: receiver while unlocked (adb root)"
 PREFS_DIR="/data/data/$PACKAGE/shared_prefs"
 PREFS="$PREFS_DIR/FlutterSharedPreferences.xml"
-if adb root >/dev/null 2>&1 && adb wait-for-device && sleep 2 && [ "$(adb shell id -u | tr -d '\r')" = "0" ]; then
+ROOT_OK=0
+adb root
+adb wait-for-device
+if wait_for_adb && [ "$(adb shell id -u | tr -d '\r')" = "0" ]; then
+  ROOT_OK=1
+fi
+if [ "$ROOT_OK" = "1" ]; then
   APP_UID="$(adb shell dumpsys package "$PACKAGE" | tr -d '\r' | grep -m1 -o 'userId=[0-9]*' | cut -d= -f2)"
+  widget_log "2/3 adb root 됨, 앱 uid=${APP_UID:-?}"
   # 앱 프로세스가 파일을 캐시하고 있으므로 세운 뒤에 쓴다.
-  adb shell am force-stop "$PACKAGE" || true
+  adb shell am force-stop "$PACKAGE"
   sleep 2
-  # shared_preferences 플러그인의 파일과 키 형식(WidgetPrefs.kt 참고). 이미
-  # 있으면 줄 하나만 끼워 넣고, 없으면 새로 만든다.
-  if adb shell "[ -f '$PREFS' ]"; then
-    adb shell "sed -i 's#</map>#    <boolean name=\"flutter.__ads_removed__\" value=\"true\" />\n</map>#' '$PREFS'"
-  else
-    adb shell "mkdir -p '$PREFS_DIR' && printf '%s\n' \"<?xml version='1.0' encoding='utf-8' standalone='yes' ?>\" '<map>' '    <boolean name=\"flutter.__ads_removed__\" value=\"true\" />' '</map>' > '$PREFS'"
+  # shared_preferences 플러그인의 파일과 키 형식(WidgetPrefs.kt 참고). 다른 키는
+  # 이 검증에 필요 없으므로 통째로 새로 쓴다.
+  adb shell "mkdir -p '$PREFS_DIR'"
+  adb shell "printf '%s\n' \"<?xml version='1.0' encoding='utf-8' standalone='yes' ?>\" '<map>' '    <boolean name=\"flutter.__ads_removed__\" value=\"true\" />' '</map>' > '$PREFS'"
+  if [ -n "$APP_UID" ]; then
+    adb shell "chown $APP_UID:$APP_UID '$PREFS_DIR' '$PREFS'"
   fi
-  adb shell "chown $APP_UID:$APP_UID '$PREFS_DIR' '$PREFS' && chmod 700 '$PREFS_DIR' && chmod 660 '$PREFS'"
-  adb shell cat "$PREFS" | tr -d '\r' >"$OUT/widget-prefs.xml" || true
+  adb shell "chmod 700 '$PREFS_DIR'; chmod 660 '$PREFS'"
+  adb shell cat "$PREFS" | tr -d '\r' >"$OUT/widget-prefs.xml"
   if grep -q '__ads_removed__' "$OUT/widget-prefs.xml"; then
     WIDGET_UNLOCKED=1
-    widget_log "2/3 구매 캐시를 써 넣었다 (uid $APP_UID)"
+    widget_log "2/3 구매 캐시를 써 넣었다"
 
     # 켜기. 앱이 세워져 있으니 리시버가 프로세스를 새로 띄우는, 실제와 같은 경로다.
     widget_toggle
@@ -84,7 +109,7 @@ if adb root >/dev/null 2>&1 && adb wait-for-device && sleep 2 && [ "$(adb shell 
       widget_log "::error::풀린 상태의 위젯 토글이 토치 서비스를 띄우지 못했다"
       WIDGET_FAILED=1
     fi
-    adb shell dumpsys activity services "$PACKAGE" | tr -d '\r' >"$OUT/widget-service-on.txt" || true
+    adb shell dumpsys activity services "$PACKAGE" | tr -d '\r' >"$OUT/widget-service-on.txt"
 
     # 끄기. 서비스가 콜백으로 꺼진 것을 보고 스스로 멈춰야 한다.
     widget_toggle
@@ -226,3 +251,6 @@ echo "::group::Widget: logs"
 adb logcat -d -v time -s LightOnTorch:V >"$OUT/logcat-widget.txt" || true
 cat "$OUT/logcat-widget.txt" || true
 echo "::endgroup::"
+
+# 부모의 set -e 를 되돌린다.
+set -e
