@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- 생성된 파일이 아니다. 손으로 고친다. id 집합은 네 레이아웃이 같아야 한다
-     (TorchWidgetProvider.kt 참고). -->
+     (TorchWidgetProvider.kt 참고). 글자와 아이콘 색의 기본값은 위젯 목록의
+     미리보기(previewLayout)를 위한 것이다. 실제로 놓이면 코드가 덮어쓴다. -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
@@ -17,6 +18,7 @@
 
         <TextView
             android:id="@+id/widget_title"
+            android:text="@string/widget_flashlight"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:paddingStart="4dp"
@@ -41,6 +43,7 @@
 
             <ImageView
                 android:id="@+id/widget_icon"
+                android:tint="@color/widget_text_off"
                 android:layout_width="72dp"
                 android:layout_height="72dp"
                 android:importantForAccessibility="no"
@@ -48,6 +51,7 @@
 
             <TextView
                 android:id="@+id/widget_label"
+                android:text="@string/widget_off"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
@@ -81,6 +85,7 @@
 
         <TextView
             android:id="@+id/widget_locked_title"
+            android:text="@string/widget_locked_title"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
@@ -93,6 +98,7 @@
 
         <TextView
             android:id="@+id/widget_locked_hint"
+            android:text="@string/widget_locked_hint"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
@@ -105,6 +111,7 @@
 
         <TextView
             android:id="@+id/widget_owner_hint"
+            android:text="@string/widget_owner_hint"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
