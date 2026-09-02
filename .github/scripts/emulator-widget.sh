@@ -35,14 +35,24 @@ widget_log() {
   echo "$*" | tee -a "$OUT/widget-log.txt"
 }
 
-# 서비스가 떠 있는지. 0 이면 안 떠 있는 것이다.
+# 토치 서비스가 *포그라운드로* 떠 있는지. 0 이면 안 떠 있는 것이다.
+#
+# ServiceRecord 가 있다는 것만으로는 부족하다. 시작이 거부된 서비스도 레코드는
+# 남아서(startForegroundCount=0, DENIED) 이름만 세면 떠 있다고 잘못 읽는다.
 torch_service_running() {
   adb shell dumpsys activity services "$PACKAGE" 2>/dev/null \
-    | grep -c "TorchService"
+    | grep -A60 "ServiceRecord.*TorchService" | grep -c "isForeground=true"
 }
 
 # 위젯 탭과 같은 브로드캐스트.
+#
+# 실제 위젯 탭은 런처가 보내는 PendingIntent 라서 앱이 잠시 백그라운드 시작
+# 허용 목록에 오르고, 그 덕에 포그라운드 서비스를 띄울 수 있다. adb 의
+# am broadcast 에는 그 특권이 없어서 그냥 보내면 ForegroundServiceStart
+# NotAllowedException 이 난다(실제로 났다: uidState RCVR, DENIED). 런처가 주는
+# 것과 같은 임시 허용을 deviceidle 로 직접 준다. root 가 아니어도 된다.
 widget_toggle() {
+  adb shell cmd deviceidle tempwhitelist -d 20000 "$PACKAGE" >/dev/null 2>&1
   adb shell am broadcast -a com.mycompany.lightonflashlight.action.WIDGET_TOGGLE \
     -n "$PACKAGE/.TorchWidget4x4" | tr -d '\r' | tee -a "$OUT/widget-log.txt"
 }
@@ -201,16 +211,30 @@ place_widget() {
   adb exec-out screencap -p >"$OUT/06b-widget-picker-expanded.png"
   adb exec-out uiautomator dump /dev/tty 2>/dev/null | tr -d '\r' >"$OUT/widget-dump-picker-expanded.xml"
 
-  # 우리 앱의 4×4 위젯. 런처는 미리보기의 content-desc 나 text 에 위젯 라벨을 쓴다.
-  center="$(node_center content-desc "Flashlight (Large)")"
+  # 우리 앱의 4×4 위젯. 펼친 목록은 세로로 길어서 Large 는 스크롤해야 보인다.
+  # 런처는 미리보기 노드(WidgetCell$2)의 content-desc 에 위젯 라벨을 그대로
+  # 쓴다. 몇 번 스크롤해도 안 보이면 눈에 띄는 다른 크기로 대신한다.
+  local i label
+  center=""
+  for i in 1 2 3 4; do
+    center="$(node_center content-desc "Flashlight (Large)")"
+    [ -n "$center" ] && { label="Large"; break; }
+    adb shell input swipe "$hx" $(( hy + 600 )) "$hx" $(( hy - 600 )) 400
+    sleep 2
+  done
   if [ -z "$center" ]; then
-    center="$(node_center text "Flashlight (Large)")"
+    for label in Wide Medium Small; do
+      center="$(node_center content-desc "Flashlight ($label)")"
+      [ -n "$center" ] && break
+    done
   fi
   if [ -z "$center" ]; then
-    widget_log "위젯 목록에서 'Flashlight (Large)' 를 찾지 못했다 (widget-dump-picker-expanded.xml 참고)"
-    adb shell input keyevent KEYCODE_BACK || true
+    widget_log "위젯 목록에서 위젯 미리보기를 찾지 못했다 (widget-dump-picker-expanded.xml 참고)"
+    adb shell input keyevent KEYCODE_BACK
     return 1
   fi
+  widget_log "3/3 끌어다 놓을 위젯: Flashlight ($label) @ $center"
+  adb exec-out uiautomator dump /dev/tty 2>/dev/null | tr -d '\r' >"$OUT/widget-dump-picker-scrolled.xml"
   wx="${center% *}"
   wy="${center#* }"
   # 길게 눌러 집어서 홈 화면 가운데에 놓는다. draganddrop 이 없는 버전은 swipe 로.
