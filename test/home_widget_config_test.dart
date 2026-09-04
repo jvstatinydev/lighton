@@ -55,6 +55,35 @@ void main() {
     test('토치 상태 감시를 프로세스 시작에 거는 Application 이 등록돼 있다', () {
       expect(manifest, contains('android:name=".LightOnApplication"'));
     });
+
+    test('알림 권한을 선언한다 (13+ 에서 토치 알림이 보이려면 필요)', () {
+      expect(manifest, contains('android.permission.POST_NOTIFICATIONS'));
+    });
+  });
+
+  group('채널 메서드 이름', () {
+    // Dart 가 부르는 이름과 Kotlin 이 받는 이름이 어긋나면 런타임에
+    // MissingPluginException 이 조용히 삼켜져 기능만 사라진다.
+    final String dart = File(
+      'lib/flutter_flow/home_widget_util.dart',
+    ).readAsStringSync();
+    final String kotlin = File(
+      'android/app/src/main/kotlin/com/mycompany/lightonflashlight/WidgetPlugin.kt',
+    ).readAsStringSync();
+
+    test('Dart 가 부르는 메서드를 WidgetPlugin.kt 가 전부 받는다', () {
+      final Set<String> called = RegExp(
+        r"""invokeMethod<[^>]*>\(\s*'([A-Za-z]+)'""",
+      ).allMatches(dart).map((RegExpMatch m) => m.group(1)!).toSet();
+      expect(called, isNotEmpty);
+      for (final String name in called) {
+        expect(
+          kotlin,
+          contains('"$name" ->'),
+          reason: '$name 을 Kotlin 이 안 받는다',
+        );
+      }
+    });
   });
 
   group('크기 선언 (res/xml)', () {

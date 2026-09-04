@@ -253,6 +253,14 @@ if [ "$ROOT_OK" = "1" ]; then
   if grep -q '__ads_removed__' "$OUT/widget-prefs.xml"; then
     WIDGET_UNLOCKED=1
     widget_log "3/4 구매 캐시를 써 넣었다"
+    # 앱은 구매한 사람에게 알림 권한을 한 번 묻는다(홈 페이지 로드 시). 여기서는
+    # 그 창을 누를 사람이 없으니 adb 로 준다. 그래야 4/4 의 알림 창 스크린샷과
+    # 녹화에 TorchService 의 "켜짐, 눌러서 끄기" 알림이 실린다.
+    if adb shell pm grant "$PACKAGE" android.permission.POST_NOTIFICATIONS; then
+      widget_log "3/4 알림 권한을 줬다"
+    else
+      widget_log "::warning::알림 권한을 주지 못했다 (매니페스트에 POST_NOTIFICATIONS 가 없나?)"
+    fi
 
     # 켜기. 앱이 세워져 있으니 리시버가 프로세스를 새로 띄우는, 실제와 같은 경로다.
     widget_toggle
@@ -353,9 +361,13 @@ if [ "$WIDGET_PLACED" = "1" ] && [ "$WIDGET_UNLOCKED" = "1" ]; then
   else
     widget_log "::warning::풀린 위젯을 눌렀는데 토치 서비스가 뜨지 않았다"
   fi
-  # 알림 창을 내려 서비스 알림을 보여 준다. POST_NOTIFICATIONS 를 요청하지 않으므로
-  # API 33+ 에서는 비어 있을 수 있다(CLAUDE.md 참고). 그래도 녹화에 "화면을 떠나도
-  # 켜져 있다" 는 장면이 들어간다.
+  # 알림 창을 내려 서비스 알림을 보여 준다. 3/4 에서 알림 권한을 줬으므로
+  # TorchService 의 알림이 있어야 한다. 없으면 서비스가 알림을 못 붙인 것이다.
+  if adb shell dumpsys notification --noredact | tr -d '\r' | grep -q "pkg=$PACKAGE"; then
+    widget_log "4/4 토치 알림이 떠 있다 (정상)"
+  else
+    widget_log "::warning::토치 서비스가 떠 있는데 알림이 없다"
+  fi
   adb shell cmd statusbar expand-notifications
   sleep 3
   adb exec-out screencap -p >"$OUT/09b-widget-on-notifications.png"

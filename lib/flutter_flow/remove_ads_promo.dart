@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../app_state.dart';
 import 'billing_util.dart';
 import 'flutter_flow_theme.dart';
+import 'home_widget_util.dart' show ensureWidgetNotificationPermission;
 import 'internationalization.dart';
 
 /// 배너를 오른쪽 정렬했을 때 왼쪽 여백에 버튼을 두려면 최소 이만큼은 있어야 한다.
@@ -159,8 +160,12 @@ class RemoveAdsInlinePromo extends StatelessWidget {
 }
 
 /// 구매와 복원을 담은 시트를 연다.
-Future<void> showRemoveAdsSheet(BuildContext context) {
-  return showModalBottomSheet<void>(
+///
+/// 시트가 닫혔을 때 구매가 돼 있으면 홈 화면 위젯의 알림 권한을 한 번 묻는다.
+/// 위젯은 산 사람에게만 풀리고, 위젯으로 켠 손전등은 알림으로만 화면 밖에서
+/// 보이기 때문이다. 시트 위에 권한 창이 겹치지 않도록 닫힌 뒤에 묻는다.
+Future<void> showRemoveAdsSheet(BuildContext context) async {
+  await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     backgroundColor: FlutterFlowTheme.of(context).secondaryBackground,
@@ -169,6 +174,9 @@ Future<void> showRemoveAdsSheet(BuildContext context) {
     ),
     builder: (BuildContext sheetContext) => const _RemoveAdsSheet(),
   );
+  if (FFAppState().adsRemoved) {
+    await ensureWidgetNotificationPermission();
+  }
 }
 
 class _RemoveAdsSheet extends StatefulWidget {

@@ -9,6 +9,7 @@ import '/flutter_flow/home_widget_util.dart'
     show
         WidgetLaunchAction,
         consumeWidgetLaunchAction,
+        ensureWidgetNotificationPermission,
         pendingWidgetLaunchAction;
 import '/flutter_flow/remove_ads_promo.dart'
     show RemoveAdsButton, kInlineRemoveAdsMinWidth, showRemoveAdsSheet;
@@ -113,6 +114,9 @@ class _HomePageWidgetState extends State<HomePageWidget>
       // 읽기와 애니메이션이 끝난 뒤여야 한다 -- 결제 시트가 그 위에 뜨거나
       // 화면 조명 토글이 초기 상태 읽기와 엇갈리면 안 된다.
       await _handleWidgetLaunchAction(await consumeWidgetLaunchAction());
+      // 이미 산 사람(복원 포함)에게 위젯 알림 권한을 한 번 묻는다. 위젯을
+      // 누르는 순간엔 앱이 없어 물을 수 없으니 앱이 떠 있는 지금이 그때다.
+      await _askWidgetNotificationPermissionIfBought();
     });
 
     animationsMap.addAll({
@@ -204,6 +208,16 @@ class _HomePageWidgetState extends State<HomePageWidget>
         // 플래시가 없는 기기. 위젯은 화면을 밝힐 수 없어 앱이 대신 한다.
         await action_blocks.toggleFlashlightThenUpdateState(context);
     }
+  }
+
+  /// 광고 제거를 산 상태라면 위젯 알림 권한을 묻는다. 한 번만 묻는 것은
+  /// [ensureWidgetNotificationPermission] 이 지킨다. 지금 사는 경우는
+  /// showRemoveAdsSheet 가 시트를 닫으며 묻는다. 여기는 이미 샀던 사람 몫이다.
+  Future<void> _askWidgetNotificationPermissionIfBought() async {
+    if (!mounted || !FFAppState().adsRemoved) {
+      return;
+    }
+    await ensureWidgetNotificationPermission();
   }
 
   @override

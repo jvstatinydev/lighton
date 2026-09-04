@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart'
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:light_on_flashlight/flutter_flow/home_widget_util.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// 홈 화면 위젯 채널의 Dart 쪽.
 ///
@@ -20,6 +21,7 @@ void main() {
     // 이 유틸은 Android 에서만 동작한다. 테스트는 리눅스에서 도니 흉내 낸다.
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     pendingWidgetLaunchAction.value = WidgetLaunchAction.none;
+    SharedPreferences.setMockInitialValues(<String, Object>{});
   });
 
   tearDown(() {
@@ -126,6 +128,57 @@ void main() {
         (ByteData? reply) {},
       );
       expect(pendingWidgetLaunchAction.value, WidgetLaunchAction.none);
+    });
+  });
+
+  group('ensureWidgetNotificationPermission', () {
+    test('처음엔 requestNotificationPermission 을 부르고 답을 돌려준다', () async {
+      final List<String> calls = <String>[];
+      messenger.setMockMethodCallHandler(channel, (MethodCall call) async {
+        calls.add(call.method);
+        return true;
+      });
+      expect(await ensureWidgetNotificationPermission(), isTrue);
+      expect(calls, <String>['requestNotificationPermission']);
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
+      expect(prefs.getBool(kWidgetNotificationAskedKey), isTrue);
+    });
+
+    test('한 번 물어본 뒤에는 다시 묻지 않는다', () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{
+        kWidgetNotificationAskedKey: true,
+      });
+      final List<String> calls = <String>[];
+      messenger.setMockMethodCallHandler(channel, (MethodCall call) async {
+        calls.add(call.method);
+        return true;
+      });
+      expect(await ensureWidgetNotificationPermission(), isFalse);
+      expect(calls, isEmpty);
+    });
+
+    test('거부는 false 이고, 그래도 물어본 것으로 남긴다', () async {
+      messenger.setMockMethodCallHandler(channel, (MethodCall call) async {
+        return false;
+      });
+      expect(await ensureWidgetNotificationPermission(), isFalse);
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
+      expect(prefs.getBool(kWidgetNotificationAskedKey), isTrue);
+    });
+
+    test('채널이 없어도 예외를 던지지 않는다', () async {
+      expect(await ensureWidgetNotificationPermission(), isFalse);
+    });
+
+    test('Android 가 아니면 채널을 건드리지 않는다', () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      final List<String> calls = <String>[];
+      messenger.setMockMethodCallHandler(channel, (MethodCall call) async {
+        calls.add(call.method);
+        return true;
+      });
+      expect(await ensureWidgetNotificationPermission(), isFalse);
+      expect(calls, isEmpty);
     });
   });
 }
