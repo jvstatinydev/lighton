@@ -363,10 +363,15 @@ if [ "$WIDGET_PLACED" = "1" ] && [ "$WIDGET_UNLOCKED" = "1" ]; then
   fi
   # 알림 창을 내려 서비스 알림을 보여 준다. 3/4 에서 알림 권한을 줬으므로
   # TorchService 의 알림이 있어야 한다. 없으면 서비스가 알림을 못 붙인 것이다.
-  if adb shell dumpsys notification --noredact | tr -d '\r' | grep -q "pkg=$PACKAGE"; then
+  # 서비스 레코드의 foregroundNoti= 줄이 가장 확실하다. dumpsys notification 은
+  # 형식이 버전마다 달라서(첫 시도에서 --noredact 로 아무것도 안 잡혔다) 참고용으로만 남긴다.
+  adb shell dumpsys activity services "$PACKAGE" | tr -d '\r' >"$OUT/widget-service-fg.txt"
+  adb shell dumpsys notification | tr -d '\r' >"$OUT/widget-notifications.txt" 2>/dev/null
+  if grep -q "foregroundNoti=Notification" "$OUT/widget-service-fg.txt" ||
+     grep -q "pkg=$PACKAGE" "$OUT/widget-notifications.txt"; then
     widget_log "4/4 토치 알림이 떠 있다 (정상)"
   else
-    widget_log "::warning::토치 서비스가 떠 있는데 알림이 없다"
+    widget_log "::warning::토치 서비스가 떠 있는데 알림이 없다 (widget-service-fg.txt, widget-notifications.txt)"
   fi
   adb shell cmd statusbar expand-notifications
   sleep 3
