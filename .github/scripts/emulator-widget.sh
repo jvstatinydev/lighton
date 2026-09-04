@@ -282,12 +282,68 @@ else
 fi
 echo "::endgroup::"
 
+# 4/4 단계를 화면 녹화로도 남긴다. Play Console 의 포그라운드 서비스 선언 폼이
+# "기능을 실행하는 단계를 보여 주는 시연 동영상" 링크를 요구하는데, 실기기 없이
+# 만들 수 있는 것이 이 녹화다(widget-demo.mp4). screenrecord 는 에뮬레이터
+# 인코더에 따라 빈 파일을 남기기도 하므로 screencap 프레임을 따로 모아
+# ffmpeg 으로 이어 붙인 widget-demo-frames.mp4 를 함께 만든다.
+REC_FLAG="$OUT/.recording"
+FRAMES_DIR="$OUT/widget-demo-frames"
+start_recording() {
+  adb shell rm -f /sdcard/widget-demo.mp4
+  adb shell screenrecord --time-limit 90 --bit-rate 4000000 /sdcard/widget-demo.mp4 &
+  mkdir -p "$FRAMES_DIR"
+  touch "$REC_FLAG"
+  (
+    i=0
+    while [ -f "$REC_FLAG" ]; do
+      adb exec-out screencap -p >"$FRAMES_DIR/$(printf '%04d' "$i").png"
+      i=$((i + 1))
+      sleep 0.5
+    done
+  ) &
+  FRAMES_PID=$!
+}
+stop_recording() {
+  rm -f "$REC_FLAG"
+  wait "$FRAMES_PID" 2>/dev/null
+  # SIGINT 로 끝내야 mp4 의 moov 가 써진다.
+  adb shell pkill -INT screenrecord
+  sleep 4
+  wait 2>/dev/null
+  adb pull /sdcard/widget-demo.mp4 "$OUT/widget-demo.mp4" || true
+  local size
+  size="$(stat -c %s "$OUT/widget-demo.mp4" 2>/dev/null || echo 0)"
+  if [ "$size" -gt 10000 ]; then
+    widget_log "4/4 화면 녹화: widget-demo.mp4 (${size} bytes)"
+  else
+    rm -f "$OUT/widget-demo.mp4"
+    widget_log "::warning::screenrecord 가 쓸 만한 파일을 남기지 않았다"
+  fi
+  local n
+  n="$(ls "$FRAMES_DIR" 2>/dev/null | wc -l)"
+  if command -v ffmpeg >/dev/null 2>&1 && [ "$n" -gt 1 ]; then
+    if ffmpeg -loglevel error -y -framerate 2 -i "$FRAMES_DIR/%04d.png" \
+        -vf 'scale=trunc(iw/2)*2:trunc(ih/2)*2' -c:v libx264 -pix_fmt yuv420p \
+        "$OUT/widget-demo-frames.mp4"; then
+      widget_log "4/4 프레임 ${n} 장 -> widget-demo-frames.mp4"
+      rm -rf "$FRAMES_DIR"
+    else
+      widget_log "::warning::ffmpeg 이 프레임을 잇지 못했다. 프레임은 $FRAMES_DIR 에 남긴다."
+    fi
+  else
+    widget_log "::warning::ffmpeg 이 없거나 프레임이 ${n} 장뿐이라 프레임 동영상은 만들지 않는다"
+  fi
+}
+
 echo "::group::Widget 4/4: tap the unlocked widget on the home screen"
 if [ "$WIDGET_PLACED" = "1" ] && [ "$WIDGET_UNLOCKED" = "1" ]; then
   adb shell input keyevent KEYCODE_HOME
   sleep 2
   # 3/4 의 토글 브로드캐스트가 위젯을 다시 그렸으므로 이제 풀린 모습이어야 한다.
   adb exec-out screencap -p >"$OUT/08-widget-unlocked.png"
+  start_recording
+  sleep 3
   # shellcheck disable=SC2086
   adb shell input tap $WIDGET_CENTER
   sleep 5
@@ -297,6 +353,20 @@ if [ "$WIDGET_PLACED" = "1" ] && [ "$WIDGET_UNLOCKED" = "1" ]; then
   else
     widget_log "::warning::풀린 위젯을 눌렀는데 토치 서비스가 뜨지 않았다"
   fi
+  # 알림 창을 내려 서비스 알림을 보여 준다. POST_NOTIFICATIONS 를 요청하지 않으므로
+  # API 33+ 에서는 비어 있을 수 있다(CLAUDE.md 참고). 그래도 녹화에 "화면을 떠나도
+  # 켜져 있다" 는 장면이 들어간다.
+  adb shell cmd statusbar expand-notifications
+  sleep 3
+  adb exec-out screencap -p >"$OUT/09b-widget-on-notifications.png"
+  adb shell cmd statusbar collapse
+  sleep 2
+  # 앱을 열어 앱의 버튼도 켜진 상태로 보이는지 남긴다(위젯과 앱이 같은 모니터를 읽는다).
+  adb shell monkey -p "$PACKAGE" -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1
+  sleep 5
+  adb exec-out screencap -p >"$OUT/09c-app-while-widget-on.png"
+  adb shell input keyevent KEYCODE_HOME
+  sleep 3
   # shellcheck disable=SC2086
   adb shell input tap $WIDGET_CENTER
   sleep 4
@@ -306,6 +376,8 @@ if [ "$WIDGET_PLACED" = "1" ] && [ "$WIDGET_UNLOCKED" = "1" ]; then
   else
     widget_log "::warning::다시 눌렀는데 토치 서비스가 남아 있다"
   fi
+  sleep 2
+  stop_recording
 else
   widget_log "4/4 건너뜀 (위젯 놓기 $WIDGET_PLACED, 구매 캐시 $WIDGET_UNLOCKED)"
 fi
